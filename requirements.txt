@@ -1,3 +1,5 @@
 shiny
 pandas
 Jinja2
+requests
+nltk.corpus
