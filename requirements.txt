@@ -1,5 +1,4 @@
-shiny
+nltk
 pandas
-Jinja2
 requests
-nltk-corpus
+shiny

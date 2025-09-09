@@ -1,7 +1,20 @@
 from shiny import App, ui, reactive, render
 import pandas as pd
 import requests
+import nltk
 from nltk.corpus import stopwords
+
+nltk_packages = ['stopwords', 'punkt']
+
+def download_nltk_data():
+    for package in nltk_packages:
+        try:
+            nltk.data.find(package)
+        except LookupError:
+            print(f"Downloading NLTK package: {package}")
+            nltk.download(package, quiet=True)
+
+download_nltk_data()
 
 url = "https://jodavid.github.io/Slide-Introdu-o-a-Web-Scrapping-com-rvest/stopwords_pt_BR.txt"
 response = requests.get(url)
@@ -32,6 +45,54 @@ app_ui = ui.page_fillable(
             .btn-default .btn-label {
                 font-size: 12px !important;
             }
+                      
+            /* ESTILO PARA TABELAS SHINY */
+            .shiny-table {
+                width: 100% !important;
+                border-collapse: collapse !important;
+                font-size: 12px !important;
+                margin: 10px 0 !important;
+            }
+            
+            .shiny-table th {
+                background-color: #f8f9fa !important;
+                padding: 10px !important;
+                text-align: left !important;
+                border: 1px solid #dee2e6 !important;
+                font-weight: bold !important;
+                color: #495057 !important;
+            }
+            
+            .shiny-table td {
+                padding: 8px !important;
+                border: 1px solid #dee2e6 !important;
+                text-align: left !important;
+            }
+            
+            .shiny-table tr:nth-child(even) {
+                background-color: #f8f9fa !important;
+            }
+            
+            .shiny-table tr:hover {
+                background-color: #e9ecef !important;
+                transition: background-color 0.2s ease;
+            }
+            
+            /* Container da tabela */
+            .shiny-table-container {
+                max-height: 500px !important;
+                overflow-y: auto !important;
+                border: 1px solid #ddd !important;
+                border-radius: 5px !important;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+            }
+            
+            /* Header fixo para scroll */
+            .shiny-table thead th {
+                position: sticky !important;
+                top: 0 !important;
+                z-index: 10 !important;
+            }
         """),
     ),
 
@@ -57,6 +118,7 @@ app_ui = ui.page_fillable(
                         "sw3": "Stopword 3 (portuguese)",
                         "sw123": "Stopword 1, 2 e 3",
                     },
+                    selected="sw1"
                 ),
                 ui.input_selectize(
                     "remove_stopwords",
@@ -192,7 +254,7 @@ app_ui = ui.page_fillable(
 )
 
 def server(input, output, session):
-    @reactive.Calc 
+    @reactive.Calc  
     def processa_dados():
         file_info = input.file1()
         if file_info is None:
@@ -203,56 +265,105 @@ def server(input, output, session):
         
         try: 
             if file['name'].endswith('.csv'):
-                try:
-                    return pd.read_csv(caminho, encoding='utf-8')
-                except:
-                    return pd.read_csv(caminho, on_bad_lines='skip', encoding='utf-8')
+                for encoding in ['utf-8', 'latin-1', 'cp1252']:
+                    try:
+                        with open(caminho, 'r', encoding=encoding) as f:
+                            primeira_linha = f.readline()
+                        
+                        if primeira_linha.count(';') > primeira_linha.count(','):
+                            separador = ';'
+                        else:
+                            separador = ','
+                        
+                        df = pd.read_csv(
+                            caminho, 
+                            encoding=encoding,
+                            sep=separador,
+                            engine='python',
+                            on_bad_lines='skip'
+                        )
+                        break
+                    except:
+                        continue
+                else:
+                    return "Erro: Não foi possível ler o arquivo CSV"
+                
+                return df.fillna("").astype(str)
+                        
             elif file['name'].endswith('.txt'):
                 with open(caminho, 'r', encoding='utf-8') as f:
                     return f.read()
             else:
                 return f"Arquivo {file['name']} não suportado"
-            
-        except Exception as e: return f"Erro: {str(e)}"
-        
-    @output()
-    @render.table()
+                    
+        except Exception as e: 
+            return f"Erro: {str(e)}"
+
+    @output
+    @render.table
     def tabela_dados():
         dados = processa_dados()
+    
         if dados is None:
-            return None
-        elif isinstance(dados,str):
-            df = pd.DataFrame(dados.splitlines(), columns=["Dados"])
-            return df.reset_index()
+            return pd.DataFrame({"Status": ["Nenhum dado disponível"]})
+        
         elif isinstance(dados, pd.DataFrame):
-            return dados.reset_index()
+            if dados.empty:
+                return pd.DataFrame({"Status": ["DataFrame vazio"]})
+            return dados.reset_index().astype(str).replace("nan", "").replace("None", "")
+        
+        elif isinstance(dados, str):
+            if not dados or dados.strip() == "":
+                return pd.DataFrame({"Status": ["Texto vazio"]})
+            df = pd.DataFrame({
+                "Índice": range(len(dados.splitlines())),
+                "Conteúdo": dados.splitlines()
+            })
+            return df.astype(str).replace("nan", "").replace("None", "")
+        
         else:
-            df = pd.DataFrame(dados)
-            return df.reset_index()
+            try:
+                df = pd.DataFrame(dados)
+                return df.reset_index().astype(str).replace("nan", "").replace("None", "")
+            except:
+                return pd.DataFrame({"Erro": ["Não foi possível processar os dados"]})
         
        
-    @output()
-    @render.text()
+    @output
+    @render.text
     def info_dados():
         dados = processa_dados()
-        if dados is None:
-            return None
-        elif isinstance(dados, str):
-            if "Erro:" in dados:
-                return dados 
-            return f"Informações: {len(dados)} caracteres"
-        elif isinstance(dados, pd.DataFrame):
-            return f"Informações: {len(dados)} linhas e {len(dados.columns)} colunas"
-        else:
-            return f"Dados carregados: {type(dados).__name__}"
         
+        if dados is None:
+            return "Nenhum dado carregado"
+        
+        elif isinstance(dados, str) and "Erro:" in dados:
+            return dados
+        
+        elif isinstance(dados, str):
+            return f"Informações: {len(dados)} caracteres"
+        
+        elif isinstance(dados, pd.DataFrame):
+            missing = dados.isna().sum()
+            total_missing = missing.sum()
+                
+            return (
+                f"Informações: {len(dados)} linhas e {len(dados.columns)} colunas | "
+                f"Quantidade de valores faltantes: {total_missing}"            
+            )
+        else:
+            return "Tipo de dado não reconhecido"
+
+    @output 
     @render.text
     def value():
         return str(input.stopwords())
 
     @reactive.Calc
-    def stopwords_selecionadas():
+    def escolha_stopwords():
         escolha = input.stopwords()
+        if escolha is None:
+            return []
         if escolha == "sw1":
             return stopwords_ptBR
         elif escolha == "sw2":
@@ -260,14 +371,21 @@ def server(input, output, session):
         elif escolha == "sw3":
             return stopwords_comentarios
         elif escolha == "sw123":
-            return all_stopwords
+            return sorted(list(all_stopwords))
         else:
             return []
 
     @output
     @render.text
-    def mostrar_stopwords():
-        return f"Stopwords selecionadas: {len(stopwords_selecionadas())}"
+    def stopwords_selecionadas():
+        try:
+            sw = escolha_stopwords()
+            if not sw: 
+                return "Nenhuma lista de stopwords selecionada."
+            return f"Stopwords selecionadas: {len(sw)}. Primeiras 20: {', '.join(sw[:20])}"
+        
+        except Exception as e:
+            return f"Erro ao carregar stopwords: {str(e)}"
 
 app = App(app_ui, server)
 
