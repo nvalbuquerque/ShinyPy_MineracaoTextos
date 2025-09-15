@@ -382,7 +382,7 @@ def server(input, output, session):
             sw = escolha_stopwords()
             if not sw: 
                 return "Nenhuma lista de stopwords selecionada."
-            return f"Stopwords selecionadas: {len(sw)}. Primeiras 20: {', '.join(sw[:20])}"
+            return f"Lista das stopwords: {', '.join(sw)}"
         
         except Exception as e:
             return f"Erro ao carregar stopwords: {str(e)}"
