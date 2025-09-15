@@ -2,3 +2,4 @@ nltk
 pandas
 requests
 shiny
+jinja2
