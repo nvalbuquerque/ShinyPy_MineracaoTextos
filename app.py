@@ -274,7 +274,7 @@ def server(input, output, session):
                         if not primeira_linha:
                             continue
                         
-                        separadores = [';', ',', '\t', '|']
+                        separadores = [';', ',', '\t']
                         separador = max(separadores, key=lambda x: primeira_linha.count(x))
                         
                         if primeira_linha.count(separador) == 0:
