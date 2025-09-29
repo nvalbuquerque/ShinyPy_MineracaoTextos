@@ -142,16 +142,16 @@ app_ui = ui.page_fillable(
                 ),
                 ui.nav_menu("Palavras removidas",
                     ui.nav_panel("Stopword 1",
-                        ui.output_text("stopwords_selecionadas"),
+                        ui.output_text("stopwords_sw1"),
                     ), 
                     ui.nav_panel("Stopword 2",
-                        "Teste stopword 2",
+                        ui.output_text("stopwords_sw2"),
                     ), 
                     ui.nav_panel("Stopword 3",
-                        "Teste stopword 3",
+                        ui.output_text("stopwords_sw3"),
                     ), 
                     ui.nav_panel("Stopword 1, 2 e 3",
-                        "Teste stopword 1, 2 e 3",
+                        ui.output_text("stopwords_sw123"),
                     ), 
                 ),  
                 ui.nav_panel("Editar stopwords"),  
@@ -264,41 +264,59 @@ def server(input, output, session):
         caminho = file['datapath']
         
         try: 
-            if file['name'].endswith('.csv'):
+            if file['name'].endswith('.csv') or file['name'].endswith('.txt'):
+                df = None
                 for encoding in ['utf-8', 'latin-1', 'cp1252']:
                     try:
                         with open(caminho, 'r', encoding=encoding) as f:
-                            primeira_linha = f.readline()
+                            primeira_linha = f.readline().strip()
                         
-                        if primeira_linha.count(';') > primeira_linha.count(','):
-                            separador = ';'
+                        if not primeira_linha:
+                            continue
+                        
+                        separadores = [';', ',', '\t', '|']
+                        separador = max(separadores, key=lambda x: primeira_linha.count(x))
+                        
+                        if primeira_linha.count(separador) == 0:
+                            with open(caminho, 'r', encoding=encoding) as f:
+                                linhas = []
+                                for linha in f:
+                                    linha_limpa = linha.strip()
+                                    if linha_limpa:  
+                                        linhas.append(linha_limpa)
+                            
+                            if linhas:
+                                df = pd.DataFrame({'conteudo': linhas})
+                            else:
+                                df = pd.DataFrame({'conteudo': ['Arquivo vazio']})
+                        
                         else:
-                            separador = ','
+                            df = pd.read_csv(
+                                caminho, 
+                                encoding=encoding,
+                                sep=separador,
+                                engine='python',
+                                on_bad_lines='skip'
+                            )
                         
-                        df = pd.read_csv(
-                            caminho, 
-                            encoding=encoding,
-                            sep=separador,
-                            engine='python',
-                            on_bad_lines='skip'
-                        )
-                        break
-                    except:
+                        if df is not None:
+                            break
+                            
+                    except Exception as e:
+                        print(f"Erro com encoding {encoding}: {str(e)}")
                         continue
-                else:
-                    return "Erro: Não foi possível ler o arquivo CSV"
                 
-                return df.fillna("").astype(str)
-                        
-            elif file['name'].endswith('.txt'):
-                with open(caminho, 'r', encoding='utf-8') as f:
-                    return f.read()
+                if df is not None:
+                    return df.fillna("").astype(str)
+                else:
+                    return "Erro: Não foi possível ler o arquivo com nenhum encoding"
+                
             else:
                 return f"Arquivo {file['name']} não suportado"
                     
         except Exception as e: 
-            return f"Erro: {str(e)}"
-
+            return f"Erro crítico: {str(e)}"
+                
     @output
     @render.table
     def tabela_dados():
@@ -312,15 +330,6 @@ def server(input, output, session):
                 return pd.DataFrame({"Status": ["DataFrame vazio"]})
             return dados.reset_index().astype(str).replace("nan", "").replace("None", "")
         
-        elif isinstance(dados, str):
-            if not dados or dados.strip() == "":
-                return pd.DataFrame({"Status": ["Texto vazio"]})
-            df = pd.DataFrame({
-                "Índice": range(len(dados.splitlines())),
-                "Conteúdo": dados.splitlines()
-            })
-            return df.astype(str).replace("nan", "").replace("None", "")
-        
         else:
             try:
                 df = pd.DataFrame(dados)
@@ -328,7 +337,6 @@ def server(input, output, session):
             except:
                 return pd.DataFrame({"Erro": ["Não foi possível processar os dados"]})
         
-       
     @output
     @render.text
     def info_dados():
@@ -336,12 +344,6 @@ def server(input, output, session):
         
         if dados is None:
             return "Nenhum dado carregado"
-        
-        elif isinstance(dados, str) and "Erro:" in dados:
-            return dados
-        
-        elif isinstance(dados, str):
-            return f"Informações: {len(dados)} caracteres"
         
         elif isinstance(dados, pd.DataFrame):
             missing = dados.isna().sum()
@@ -351,6 +353,7 @@ def server(input, output, session):
                 f"Informações: {len(dados)} linhas e {len(dados.columns)} colunas | "
                 f"Quantidade de valores faltantes: {total_missing}"            
             )
+        
         else:
             return "Tipo de dado não reconhecido"
 
@@ -377,15 +380,23 @@ def server(input, output, session):
 
     @output
     @render.text
-    def stopwords_selecionadas():
-        try:
-            sw = escolha_stopwords()
-            if not sw: 
-                return "Nenhuma lista de stopwords selecionada."
-            return f"Lista das stopwords: {', '.join(sw)}"
-        
-        except Exception as e:
-            return f"Erro ao carregar stopwords: {str(e)}"
+    def stopwords_sw1():
+        return f"Stopwords 1: {', '.join(stopwords_ptBR)}"
+
+    @output
+    @render.text
+    def stopwords_sw2():
+        return f"Stopwords 2: {', '.join(stopwords_iso)}"
+
+    @output
+    @render.text
+    def stopwords_sw3():
+        return f"Stopwords 3: {', '.join(stopwords_comentarios)}"
+
+    @output
+    @render.text
+    def stopwords_sw123():
+        return f"Todas stopwords: {', '.join(sorted(list(all_stopwords)))}"
 
 app = App(app_ui, server)
 
