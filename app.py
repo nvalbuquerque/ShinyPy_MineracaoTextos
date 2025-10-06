@@ -109,26 +109,6 @@ app_ui = ui.page_fillable(
                     placeholder="Nenhum arquivo selecionado",
                     button_label="Procurar",
                 ),
-                ui.input_radio_buttons(
-                    "stopwords",
-                    "Selecione uma lista de stopwords:",
-                    choices={
-                        "sw1": "Stopword 1 (pt_BR)",
-                        "sw2": "Stopword 2 (pt_ISO)",
-                        "sw3": "Stopword 3 (portuguese)",
-                        "sw123": "Stopword 1, 2 e 3",
-                    },
-                    selected="sw1"
-                ),
-                ui.input_selectize(
-                    "remove_stopwords",
-                    "Remover stopwords:",
-                    choices=[""] + [teste for teste in range(0, 11)],
-                    selected=None,
-                    multiple=False,
-                    options={"allowEmptyOption": True,
-                             "placeholder": "Busque as stopwords"}, 
-                ),
                 ui.input_slider("altura", "Altura", min = 100, max = 800 , value = 550),
                 ui.input_slider("largura", "Largura", min = 100, max = 800 , value = 650),
                 bg="#f8f8f8",
@@ -140,21 +120,59 @@ app_ui = ui.page_fillable(
                     ui.output_text("info_dados"),
                     ui.output_table("tabela_dados")
                 ),
-                ui.nav_menu("Palavras removidas",
+                ui.nav_menu("Visualização das listas de stopwords",
                     ui.nav_panel("Stopword 1",
-                        ui.output_text("stopwords_sw1"),
+                        ui.output_table("tabela_stopwords_1"),
                     ), 
                     ui.nav_panel("Stopword 2",
-                        ui.output_text("stopwords_sw2"),
+                        ui.output_table("tabela_stopwords_2"),
                     ), 
                     ui.nav_panel("Stopword 3",
-                        ui.output_text("stopwords_sw3"),
+                        ui.output_table("tabela_stopwords_3"),
                     ), 
                     ui.nav_panel("Stopword 1, 2 e 3",
-                        ui.output_text("stopwords_sw123"),
+                        ui.output_table("tabela_stopwords_123"),
                     ), 
+                ), 
+                ui.nav_panel("Editar lista de stopwords selecionada",
+                    ui.input_radio_buttons(
+                        "stopwords",
+                        "Selecione uma lista de stopwords:",
+                        choices={
+                            "sw1": "Stopword 1 (pt_BR)",
+                            "sw2": "Stopword 2 (pt_ISO)",
+                            "sw3": "Stopword 3 (portuguese)",
+                            "sw123": "Stopword 1, 2 e 3",
+                        },
+                        selected="sw1",
+                        inline=True
+                    ),
+                     ui.layout_columns(  # ← BOTÕES EM LINHA
+                         ui.input_text(
+                            "nova_palavra",
+                            None,
+                            placeholder="Digite uma palavra...", 
+                        ),
+                        ui.input_action_button(
+                            "adicionar_palavra",
+                            "Adicionar palavra",
+                            class_="btn-success"
+                        ),
+                        ui.input_action_button(
+                            "remover_selecionadas", 
+                            "Remover palavra",
+                            class_="btn-danger"
+                        ),
+                        ui.input_action_button(
+                            "resetar_lista",
+                            "Resetar para original",
+                            class_="btn-warning"
+                        ),
+                        col_widths=(3, 3, 3, 3)  # 3 colunas de igual largura
+                    ),
+                    ui.output_table("tabela_edicao"),
+                    ui.output_text("status_edicao")
                 ),  
-                ui.nav_panel("Editar stopwords"),  
                 ui.nav_menu("Pré-processamento",
                     ui.nav_panel("Remove pontuação e números",
                         "Teste Remove pontuação e números",
@@ -368,35 +386,136 @@ def server(input, output, session):
         if escolha is None:
             return []
         if escolha == "sw1":
-            return stopwords_ptBR
+            return stopwords_edit_sw1()
         elif escolha == "sw2":
-            return stopwords_iso
+            return stopwords_edit_sw2()
         elif escolha == "sw3":
-            return stopwords_comentarios
+            return stopwords_edit_sw3()
         elif escolha == "sw123":
-            return sorted(list(all_stopwords))
+            return stopwords_edit_sw123()
         else:
             return []
 
     @output
-    @render.text
-    def stopwords_sw1():
-        return f"Stopwords 1: {', '.join(stopwords_ptBR)}"
+    @render.table
+    def tabela_stopwords_1():
+        return pd.DataFrame({"Stopwords": list(stopwords_ptBR)})
 
     @output
-    @render.text
-    def stopwords_sw2():
-        return f"Stopwords 2: {', '.join(stopwords_iso)}"
+    @render.table
+    def tabela_stopwords_2():
+        return pd.DataFrame({"Stopwords": list(stopwords_iso)})
 
     @output
-    @render.text
-    def stopwords_sw3():
-        return f"Stopwords 3: {', '.join(stopwords_comentarios)}"
+    @render.table
+    def tabela_stopwords_3():
+        return pd.DataFrame({"Stopwords": list(stopwords_comentarios)})
 
     @output
-    @render.text
-    def stopwords_sw123():
-        return f"Todas stopwords: {', '.join(sorted(list(all_stopwords)))}"
+    @render.table
+    def tabela_stopwords_123():
+        return pd.DataFrame({"Stopwords": sorted(list(all_stopwords))})
+
+
+    stopwords_edit_sw1 = reactive.Value(list(stopwords_ptBR))
+    stopwords_edit_sw2 = reactive.Value(list(stopwords_iso))
+    stopwords_edit_sw3 = reactive.Value(list(stopwords_comentarios))
+    stopwords_edit_sw123 = reactive.Value(list(all_stopwords))
+
+    @output
+    @render.table
+    def tabela_stopwords_1():
+        return pd.DataFrame({"Stopwords": stopwords_edit_sw1.get()})
+
+    @output
+    @render.table
+    def tabela_stopwords_2():
+        return pd.DataFrame({"Stopwords": stopwords_edit_sw2.get()})
+
+    @output
+    @render.table
+    def tabela_stopwords_3():
+        return pd.DataFrame({"Stopwords": stopwords_edit_sw3.get()})
+
+    @output
+    @render.table
+    def tabela_stopwords_123():
+        return pd.DataFrame({"Stopwords": sorted(stopwords_edit_sw123.get())})
+
+    @reactive.Calc
+    def conjunto_editavel():
+        escolha = input.stopwords()
+        if escolha == "sw1":
+            return stopwords_edit_sw1
+        elif escolha == "sw2":
+            return stopwords_edit_sw2
+        elif escolha == "sw3":
+            return stopwords_edit_sw3
+        elif escolha == "sw123":
+            return stopwords_edit_sw123
+        return stopwords_edit_sw1
+
+    @output
+    @render.table
+    def tabela_edicao():
+        conjunto = conjunto_editavel()
+    
+        palavras = conjunto.get()
+
+        df = pd.DataFrame({
+            "Palavra": sorted(palavras),
+        })
+        return df
+
+    @reactive.Effect
+    @reactive.event(input.adicionar_palavra)
+    def adicionar_palavra():
+        nova_palavra = input.nova_palavra().strip().lower()
+        if not nova_palavra:
+            return
+        
+        conjunto = conjunto_editavel()
+
+        palavras_atual = set(conjunto.get())
+        palavras_atual.add(nova_palavra)
+        conjunto.set(sorted(list(palavras_atual)))
+            
+        ui.update_text("nova_palavra", value="")
+
+    @reactive.Effect
+    @reactive.event(input.remover_selecionadas)
+    def remover_palavras():
+        conjunto = conjunto_editavel()
+        
+        palavra_remover = input.nova_palavra().strip().lower()
+        if not palavra_remover:
+            return
+            
+        palavras_atual = set(conjunto.get())
+        if palavra_remover in palavras_atual:
+            palavras_atual.remove(palavra_remover)
+            conjunto.set(sorted(list(palavras_atual)))
+            ui.update_text("nova_palavra", value="")
+
+    @reactive.Effect
+    @reactive.event(input.resetar_lista)
+    def resetar_lista():
+        conjunto = conjunto_editavel()
+        
+        escolha = input.stopwords()
+        if escolha == "sw1":
+            conjunto.set(list(stopwords_ptBR))
+        elif escolha == "sw2":
+            conjunto.set(list(stopwords_iso))
+        elif escolha == "sw3":
+            conjunto.set(list(stopwords_comentarios))
+        elif escolha == "sw123":
+            conjunto.set(list(all_stopwords))
+
+    @reactive.Effect
+    @reactive.event(input.adicionar_palavra, input.remover_selecionadas, input.resetar_lista)
+    def atualizar_visualizacoes():
+        pass
 
 app = App(app_ui, server)
 
