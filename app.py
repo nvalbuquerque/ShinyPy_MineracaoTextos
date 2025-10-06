@@ -156,19 +156,16 @@ app_ui = ui.page_fillable(
                         ui.input_action_button(
                             "adicionar_palavra",
                             "Adicionar palavra",
-                            class_="btn-success"
                         ),
                         ui.input_action_button(
                             "remover_selecionadas", 
                             "Remover palavra",
-                            class_="btn-danger"
                         ),
                         ui.input_action_button(
                             "resetar_lista",
                             "Resetar para original",
-                            class_="btn-warning"
                         ),
-                        col_widths=(3, 3, 3, 3)  # 3 colunas de igual largura
+                        col_widths=(3, 3, 3, 3)  
                     ),
                     ui.output_table("tabela_edicao"),
                     ui.output_text("status_edicao")
