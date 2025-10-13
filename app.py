@@ -13,4 +13,4 @@ app_server = setup_server
 app = App(app_ui, app_server)
 
 if __name__ == "__main__":
-    app.run(port=8000)
+    app.run(port=0)
