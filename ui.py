@@ -78,7 +78,7 @@ def create_ui():
                             ui.output_table("tabela_sem_stopwords_minuscula"),
                         ), 
                         ui.nav_panel("Retira plural",
-                            "Teste Retira plural",
+                            ui.output_table("tabela_sem_plural"),
                         ),
                         ui.nav_panel("Elege representante",
                             "Teste Elege representante",

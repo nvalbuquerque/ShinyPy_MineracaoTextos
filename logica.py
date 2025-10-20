@@ -261,13 +261,12 @@ def setup_server(input, output, session):
         else:
             return None
         
-    import re
 
     @reactive.Calc
     def remove_stopw_minuscula():
         tabela_editada = conjunto_editavel().get()
         if not tabela_editada:
-            return remove_repeticao()  # se não houver stopwords, retorna os dados limpos
+            return remove_repeticao() 
         
         dados = remove_repeticao()
         if dados is None or not isinstance(dados, pd.DataFrame):
@@ -289,6 +288,58 @@ def setup_server(input, output, session):
     @render.table
     def tabela_sem_stopwords_minuscula():
         dados = remove_stopw_minuscula()  
+        if isinstance(dados, pd.DataFrame):
+            return dados
+        else:
+            return None
+
+    import pandas as pd
+
+    def remover_plurais_texto(texto):
+        if pd.isna(texto):
+            return texto
+        
+        excecoes = {'variáveis': 'variável', 'tangíveis': 'tangível'}
+        
+        palavras = str(texto).split()
+        resultado = []
+        
+        for palavra in palavras:
+            if palavra in excecoes:
+                resultado.append(excecoes[palavra])
+            elif palavra.endswith('s'):
+                if palavra.endswith(('ões', 'ãos', 'ães')): resultado.append(palavra[:-3] + 'ão')
+                elif palavra.endswith('zes'): resultado.append(palavra[:-2])
+                elif palavra.endswith('res'): resultado.append(palavra[:-2])
+                elif palavra.endswith('ais'): resultado.append(palavra[:-2] + 'l')
+                elif palavra.endswith('ns'): resultado.append(palavra[:-2] + 'm')
+                elif palavra.endswith(('os', 'as', 'es')): resultado.append(palavra[:-1])
+                else: resultado.append(palavra)
+            else:
+                resultado.append(palavra)
+        
+        return ' '.join(resultado)
+
+    @reactive.Calc
+    def remove_plurais():
+        dados_processados = remove_stopw_minuscula()
+        
+        if dados_processados is None or not isinstance(dados_processados, pd.DataFrame):
+            return None
+        
+        dados_sem_plurais = dados_processados.copy()
+        
+        for coluna in dados_sem_plurais.columns:
+            if dados_sem_plurais[coluna].dtype == 'object':
+                dados_sem_plurais[coluna] = dados_sem_plurais[coluna].apply(remover_plurais_texto)
+        
+        return dados_sem_plurais
+
+    @output
+    @render.table
+    def tabela_sem_plural():
+        dados = remove_plurais()
+        
         if isinstance(dados, pd.DataFrame):
             return dados
         else:
