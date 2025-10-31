@@ -13,9 +13,9 @@ def create_ui():
             ui.layout_sidebar(
                 ui.sidebar(
                     ui.input_file(
-                        "file1", 
+                        "file1",
                         label="Selecione um arquivo",
-                        multiple=False, 
+                        multiple=False,
                         accept=".txt, .csv",
                         placeholder="Nenhum arquivo selecionado",
                         button_label="Procurar",
@@ -26,12 +26,15 @@ def create_ui():
                     open="open",
                 ),
 
-                ui.page_navbar(  
-                    ui.nav_panel("Dados importados",
+                ui.page_navbar(
+                    ui.nav_panel(
+                        "Dados importados",
                         ui.output_text("info_dados"),
-                        ui.output_table("tabela_dados")
+                        ui.output_table("tabela_dados"),
                     ),
-                    ui.nav_panel("Editar lista de stopwords",
+
+                    ui.nav_panel(
+                        "Editar lista de stopwords",
                         ui.input_radio_buttons(
                             "stopwords",
                             "Selecione uma lista de stopwords:",
@@ -44,123 +47,104 @@ def create_ui():
                             selected="sw1",
                             inline=True
                         ),
-                         ui.layout_columns(
-                             ui.input_text(
+
+                        ui.layout_columns(
+                            ui.input_text(
                                 "nova_palavra",
                                 None,
-                                placeholder="Digite uma palavra...", 
+                                placeholder="Digite uma palavra...",
                             ),
                             ui.input_action_button(
                                 "adicionar_palavra",
                                 "Adicionar palavra",
                             ),
                             ui.input_action_button(
-                                "remover_selecionadas", 
+                                "remover_selecionadas",
                                 "Remover palavra",
                             ),
                             ui.input_action_button(
                                 "resetar_lista",
                                 "Resetar para original",
                             ),
-                            col_widths=(3, 3, 3, 3)  
+                            col_widths=(3, 3, 3, 3)
                         ),
+
                         ui.output_table("tabela_edicao"),
-                        ui.output_text("status_edicao")
-                    ),  
-                    ui.nav_menu("Pré-processamento",
-                        ui.nav_panel("Remove pontuação e números",
+                        ui.output_text("status_edicao"),
+                    ),
+
+                    ui.nav_menu(
+                        "Pré-processamento",
+                        ui.nav_panel(
+                            "Remove pontuação e números",
                             ui.output_table("tabela_sem_pontuacao_num"),
-                        ), 
-                        ui.nav_panel("Remove caracteres repetidos",
+                        ),
+                        ui.nav_panel(
+                            "Remove caracteres repetidos",
                             ui.output_table("tabela_sem_repeticao"),
-                        ), 
-                        ui.nav_panel("Remove stopwords e converte para minúsculo",
+                        ),
+                        ui.nav_panel(
+                            "Remove stopwords e converte para minúsculo",
                             ui.output_table("tabela_sem_stopwords_minuscula"),
-                        ), 
-                        ui.nav_panel("Retira plural",
+                        ),
+                        ui.nav_panel(
+                            "Retira plural",
                             ui.output_table("tabela_sem_plural"),
                         ),
-                        ui.nav_panel("Elege representante",
+                        ui.nav_panel(
+                            "Elege representante",
+                            "O shiny não funciona",
                             ui.output_table("tabela_elege_representante"),
                         ),
-                        ui.nav_panel("Remove acentuação e dois caracteres",
+                        ui.nav_panel(
+                            "Remove acentuação e dois caracteres",
                             "Teste Remove acentuação e dois caracteres",
-                        ), 
-                    ),  
-                    ui.nav_menu("Tabela de Frequência",
-                        ui.nav_panel("Palavras",
-                            "Teste Palavras",
-                        ),
-                        ui.nav_panel("Bigramas",
-                            "Teste Bigramas",
-                        ),
-                        ui.nav_panel("Trigramas",
-                            "Teste Trigramas",
-                        ),
-                        ui.nav_panel("Tetragramas",
-                            "Teste Tetragramas",
-                        ),
-                        ui.nav_panel("Pentagramas",
-                            "Teste Pentagramas",
                         ),
                     ),
-                    ui.nav_menu("Gráfico de Frequência",
-                        ui.nav_panel("Palavras",
-                            "Teste Palavras",
-                        ),
-                        ui.nav_panel("Bigramas",
-                            "Teste Bigramas",
-                        ),
-                        ui.nav_panel("Trigramas",
-                            "Teste Trigramas",
-                        ),
-                        ui.nav_panel("Tetragramas",
-                            "Teste Tetragramas",
-                        ),
-                        ui.nav_panel("Pentagramas",
-                            "Teste Pentagramas",
-                        ),
+
+                    ui.nav_menu(
+                        "Tabela de Frequência",
+                        ui.nav_panel("Palavras", "Teste Palavras"),
+                        ui.nav_panel("Bigramas", "Teste Bigramas"),
+                        ui.nav_panel("Trigramas", "Teste Trigramas"),
+                        ui.nav_panel("Tetragramas", "Teste Tetragramas"),
+                        ui.nav_panel("Pentagramas", "Teste Pentagramas"),
                     ),
-                    ui.nav_menu("Nuvens de palavras",
-                        ui.nav_panel("Palavras",
-                            "Teste Palavras",
-                        ),
-                        ui.nav_panel("Bigramas",
-                            "Teste Bigramas",
-                        ),
-                        ui.nav_panel("Trigramas",
-                            "Teste Trigramas",
-                        ),
-                        ui.nav_panel("Tetragramas",
-                            "Teste Tetragramas",
-                        ),
-                        ui.nav_panel("Pentagramas",
-                            "Teste Pentagramas",
-                        ),
-                    ),  
-                    ui.nav_menu("Análise de tópicos",
-                        ui.nav_panel("Palavras",
-                            "Teste Palavras",
-                        ),
-                        ui.nav_panel("Bigramas",
-                            "Teste Bigramas",
-                        ),
-                        ui.nav_panel("Trigramas",
-                            "Teste Trigramas",
-                        ),
-                        ui.nav_panel("Tetragramas",
-                            "Teste Tetragramas",
-                        ),
-                        ui.nav_panel("Pentagramas",
-                            "Teste Pentagramas",
-                        ),
-                    ),  
+
+                    ui.nav_menu(
+                        "Gráfico de Frequência",
+                        ui.nav_panel("Palavras", "Teste Palavras"),
+                        ui.nav_panel("Bigramas", "Teste Bigramas"),
+                        ui.nav_panel("Trigramas", "Teste Trigramas"),
+                        ui.nav_panel("Tetragramas", "Teste Tetragramas"),
+                        ui.nav_panel("Pentagramas", "Teste Pentagramas"),
+                    ),
+
+                    ui.nav_menu(
+                        "Nuvens de palavras",
+                        ui.nav_panel("Palavras", "Teste Palavras"),
+                        ui.nav_panel("Bigramas", "Teste Bigramas"),
+                        ui.nav_panel("Trigramas", "Teste Trigramas"),
+                        ui.nav_panel("Tetragramas", "Teste Tetragramas"),
+                        ui.nav_panel("Pentagramas", "Teste Pentagramas"),
+                    ),
+
+                    ui.nav_menu(
+                        "Análise de tópicos",
+                        ui.nav_panel("Palavras", "Teste Palavras"),
+                        ui.nav_panel("Bigramas", "Teste Bigramas"),
+                        ui.nav_panel("Trigramas", "Teste Trigramas"),
+                        ui.nav_panel("Tetragramas", "Teste Tetragramas"),
+                        ui.nav_panel("Pentagramas", "Teste Pentagramas"),
+                    ),
+
                     ui.nav_panel("Sentimentos"),
-                    ui.nav_panel("Clusterização"),  
-                    ui.nav_panel("KMeans"),  
+                    ui.nav_panel("Clusterização"),
+                    ui.nav_panel("KMeans"),
                     ui.nav_panel("Redes"),
-                    id="page",  
+
+                    id="page",
                 ),
             ),
-        )
+        ),
     )

@@ -350,15 +350,73 @@ def setup_server(input, output, session):
         dados_processados = remove_plurais()
         
         if dados_processados is None or dados_processados.empty:
-            return pd.DataFrame(columns=['Palavra', 'Frequência'])
+            return []
         
         dados_freq = dados_processados.copy() 
 
-        coluna_texto = next((c for c in dados_freq.columns if dados_freq[c].dtype == 'object'), None)
-        if not coluna_texto:
-            return pd.DataFrame(columns=['Palavra', 'Frequência'])
+        coluna_texto = None
+        for coluna in dados_freq.columns:
+            if dados_freq[coluna].dtype == 'object':
+                coluna_texto = coluna
+                break
+            
+        if coluna_texto is None:
+            return []
+
+        dados_freq = (
+            dados_freq[coluna_texto]
+            .dropna()
+            .str.split()
+            .explode()
+            .str.lower()
+            .value_counts()
+            .reset_index()
+        )
+
+        dados_freq.columns = ['Palavra', 'Frequência']
+        dados_freq = dados_freq.sort_values(by='Frequência', ascending=False).reset_index(drop=True)
         
-        '''
+        return list(dados_freq.itertuples(index=False, name=None))
+
+    @reactive.Calc
+    def elege_representante():
+        dados_freq = frequencia_absoluta()
+
+        stemmer = SnowballStemmer('portuguese')
+
+        palavras_originais = []
+        stems = []
+
+        for palavra, frequencia in dados_freq:
+            stem = stemmer.stem(palavra)
+
+            if stem not in stems:
+                palavras_originais.append(palavra)
+                stems.append(stem)
+
+        resultado = pd.DataFrame({
+            "Palavra_Representante": palavras_originais,
+            "Stem_Agrupador": stems
+        })
+
+        return resultado
+
+    @output
+    @render.table
+    def tabela_elege_representante():
+        dados = elege_representante()
+        return dados
+
+    '''
+    @reactive.Calc    
+    def frequencia_absoluta():
+        dados_processados = remove_plurais()
+        
+        if dados_processados is None or dados_processados.empty:
+            return [pd.DataFrame(columns=['Palavra', 'Frequência'])]
+        
+        dados_freq = dados_processados.copy() 
+
         coluna_texto = None
         for coluna in dados_freq.columns:
             if dados_freq[coluna].dtype == 'object':
@@ -367,7 +425,6 @@ def setup_server(input, output, session):
             
         if coluna_texto is None:
             return pd.DataFrame(columns=['Palavra', 'Frequência'])
-        '''
 
         dados_freq = (
             dados_freq[coluna_texto]
@@ -386,7 +443,6 @@ def setup_server(input, output, session):
 
     @reactive.Calc
     def elege_representante():
-        _=processa_dados()  # Garante que os dados foram processados
         dados_freq = frequencia_absoluta()
 
         if dados_freq is None or dados_freq.empty:
@@ -394,7 +450,6 @@ def setup_server(input, output, session):
 
         stemmer = SnowballStemmer('portuguese')
 
-        # Listas para armazenar a palavra original e o stem correspondente
         palavras_originais = []
         stems = []
 
@@ -407,7 +462,6 @@ def setup_server(input, output, session):
                 palavras_originais.append(palavra)
                 stems.append(stem)
 
-        # Cria DataFrame final com colunas consistentes para o UI
         resultado = pd.DataFrame({
             "Palavra_Representante": palavras_originais,
             "Stem_Agrupador": stems
@@ -419,47 +473,6 @@ def setup_server(input, output, session):
     @render.table
     def tabela_elege_representante():
         dados = elege_representante()
-        if isinstance(dados, pd.DataFrame) and not dados.empty:
-            return dados[["Palavra_Representante", "Stem_Agrupador"]]
-        return pd.DataFrame(columns=["Palavra_Representante", "Stem_Agrupador"])
-
 
     '''
-    @reactive.Calc
-    def elege_representante():
-        dados_processados = frequencia_absoluta()
-
-        if dados_processados is None or dados_processados.empty:
-            return pd.DataFrame(columns=["Representante", "Stem"])
-
-        stemmer = SnowballStemmer('portuguese')
-        dados_representante = dados_processados.copy()
-        dados_representante['Representante'] = dados_representante['Palavra'].apply(stemmer.stem)
-
-        stem_para_original = {}
-        for _, row in dados_representante.iterrows():
-            stem = row['Representante']
-            palavra = row['Palavra']
-            if stem not in stem_para_original:
-                stem_para_original[stem] = palavra
-
-        resultado = pd.DataFrame([
-            {'Representante': palavra, 'Stem': stem}
-            for stem, palavra in stem_para_original.items()
-        ])
-
-        return resultado
-
-    @output
-    @render.table
-    def tabela_elege_representante():
-        dados = elege_representante()
-        if isinstance(dados, pd.DataFrame) and not dados.empty:
-            # garante que as colunas existem
-            for col in ["Representante", "Stem"]:
-                if col not in dados.columns:
-                    dados[col] = ""
-            return dados[["Representante", "Stem"]]
-        
-        return pd.DataFrame([{"Representante": "", "Stem": ""}])
-    '''
+    
