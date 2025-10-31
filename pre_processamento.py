@@ -22,3 +22,4 @@ def tabela_sem_pontuacao():
     if isinstance(dados, pd.DataFrame):
         return remove_pontuacao_numeros(dados)  
     return dados
+

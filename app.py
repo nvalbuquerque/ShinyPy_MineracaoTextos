@@ -8,7 +8,9 @@ from ui import create_ui
 from logica import setup_server
 
 app_ui = create_ui()
-app_server = setup_server
+
+def app_server(input, output, session):
+    setup_server(input, output, session)
 
 app = App(app_ui, app_server)
 
