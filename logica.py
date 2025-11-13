@@ -2,7 +2,10 @@ from shiny import reactive, render, ui
 import pandas as pd
 import string
 import re
+import nltk
 from nltk.stem import SnowballStemmer
+import io
+from datetime import datetime
 
 from config import load_stopwords
 
@@ -334,6 +337,34 @@ def setup_server(input, output, session):
                 dados_sem_plurais[coluna] = dados_sem_plurais[coluna].apply(remover_plurais_texto)
         
         return dados_sem_plurais
+    
+    # TESTE PARA DOWNLOAD DA TABELA SEM PLURAIS
+    @reactive.Calc
+    def get_dados_processados():
+        """Retorna os dados processados após remove_plurais() para download"""
+        return remove_plurais()
+
+    @session.download(
+        filename=lambda: f"dados_processados_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+    )
+    def download_dados_processados():
+        """Download dos dados processados finais"""
+        dados = get_dados_processados()
+        if dados is not None and isinstance(dados, pd.DataFrame) and not dados.empty:
+            output = io.StringIO()
+            dados.to_csv(output, index=False, encoding='utf-8')
+            output.seek(0)
+            yield output.getvalue()
+
+    @output
+    @render.ui
+    def ui_download():
+        """Interface para download dos dados processados"""
+        if processa_dados() is None or not isinstance(processa_dados(), pd.DataFrame):
+            return ui.p("Carregue um arquivo para habilitar o download.")
+        
+        return ui.download_button("download_dados_processados", "📥 Download Dados Processados", class_="btn btn-primary")
+    ## FIM TESTE DOWNLOAD
 
     @output
     @render.table
@@ -345,11 +376,13 @@ def setup_server(input, output, session):
         else:
             return None
     
+
     @reactive.Calc    
     def frequencia_absoluta():
         dados_processados = remove_plurais()
         
         if dados_processados is None or dados_processados.empty:
+            print("Dados processados estão vazios.")
             return []
         
         dados_freq = dados_processados.copy() 
@@ -361,6 +394,7 @@ def setup_server(input, output, session):
                 break
             
         if coluna_texto is None:
+            print("Nenhuma coluna de texto encontrada para análise de frequência.")
             return []
 
         dados_freq = (
@@ -376,8 +410,10 @@ def setup_server(input, output, session):
         dados_freq.columns = ['Palavra', 'Frequência']
         dados_freq = dados_freq.sort_values(by='Frequência', ascending=False).reset_index(drop=True)
         
+        #return dados_freq
         return list(dados_freq.itertuples(index=False, name=None))
 
+    ###### verificar se o stem existe dentro do shiny!!!!
     @reactive.Calc
     def elege_representante():
         dados_freq = frequencia_absoluta()
@@ -394,6 +430,7 @@ def setup_server(input, output, session):
                 palavras_originais.append(palavra)
                 stems.append(stem)
 
+        # adicionar uma verificacao de palavra original, palavra representante e stem
         resultado = pd.DataFrame({
             "Palavra_Representante": palavras_originais,
             "Stem_Agrupador": stems
@@ -407,6 +444,7 @@ def setup_server(input, output, session):
         dados = elege_representante()
         return dados
 
+    
     '''
     @reactive.Calc    
     def frequencia_absoluta():

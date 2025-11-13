@@ -3,7 +3,7 @@ import os
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from shiny import App
+from shiny import App, render
 from ui import create_ui
 from logica import setup_server
 
