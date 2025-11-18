@@ -71,6 +71,7 @@ def teste_representante():
     
     # REPRESENTANTE POR LEMATIZAÇÃO USANDO SPACY
     # criar dicionario de atrativos turísticos do paraná para melhorar lematização, substituir areiar por areia
+    # colocar parametrização: processo de seleção das palavras que não devem ser processadas pelo código, lembrar stopwords. O usuário escolhe
     nlp = spacy.load("pt_core_news_sm")
     palavras_representantes = []
     lemas_agrupadores = []
