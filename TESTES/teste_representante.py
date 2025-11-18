@@ -6,7 +6,7 @@ import spacy
 # fazer relatorio entre diferença stem e lema para representante de palavras
 
 def teste_representante():
-    caminho = r"C:\Users\Windows 11\Downloads\dados_processados_20251101_115629.csv"
+    caminho = r"C:\Users\Windows 11\Documents\ShinyPy_MineracaoTextos\ShinyPy_MineracaoTextos\TESTES\dados_processados_20251117_224012.csv"
 
     dados_processados = pd.read_csv(caminho, encoding='utf-8')
     
@@ -40,6 +40,7 @@ def teste_representante():
     print("\n10 PALAVRAS MAIS FREQUENTES:")
     print(dados_freq.head(10).to_string(index=False))
     
+    '''
     # REPRESENTANTE POR STEMMING
     stemmer = SnowballStemmer('portuguese')
     palavras_originais = []
@@ -63,10 +64,13 @@ def teste_representante():
     print("\nPRIMEIROS 15 REPRESENTANTES STEM:")
     print(resultadoStem.head(15).to_string(index=False))
 
+    '''
+
     # REPRESENTANTE POR LEMATIZAÇÃO USANDO NLTK
         # Não funciona pq o nltk não tem suporte para lematização em português
     
     # REPRESENTANTE POR LEMATIZAÇÃO USANDO SPACY
+    # criar dicionario de atrativos turísticos do paraná para melhorar lematização, substituir areiar por areia
     nlp = spacy.load("pt_core_news_sm")
     palavras_representantes = []
     lemas_agrupadores = []
@@ -98,12 +102,12 @@ def teste_representante():
     # COMPARATIVO
     # Renomear colunas para facilitar merge
     freq = dados_freq.rename(columns={"Palavra": "Palavra_Original"})
-    stem = resultadoStem.rename(columns={"Palavra_Representante": "Palavra_Original"})
+    #stem = resultadoStem.rename(columns={"Palavra_Representante": "Palavra_Original"})
     lema = resultadoLema.rename(columns={"Palavra_Representante": "Palavra_Original"})
 
     # Fazer merge progressivo
-    comparativo = freq.merge(stem, on="Palavra_Original", how="left") \
-                      .merge(lema, on="Palavra_Original", how="left")
+    #comparativo = freq.merge(stem, on="Palavra_Original", how="left") \ .merge(lema, on="Palavra_Original", how="left")
+    comparativo = freq.merge(lema, on="Palavra_Original", how="left")
 
     print("\n=== COMPARAÇÃO: Palavra | Frequência | Stem | Lemma ===")
     print(comparativo.head(30).to_string(index=False))

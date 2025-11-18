@@ -302,7 +302,7 @@ def setup_server(input, output, session):
         if pd.isna(texto):
             return texto
         
-        excecoes = {'variáveis': 'variável', 'tangíveis': 'tangível'}
+        excecoes = {'variáveis': 'variável', 'tangíveis': 'tangível', 'simples': 'simples', 'mais': 'mais', 'ônibus': 'ônibus', 'cais': 'cais', 'atlas': 'atlas', 'campus': 'campus', 'bônus': 'bônus', 'status': 'status', 'lápis': 'lápis'}
         
         palavras = str(texto).split()
         resultado = []
@@ -513,4 +513,42 @@ def setup_server(input, output, session):
         dados = elege_representante()
 
     '''
+    @reactive.Calc
+    def remove_acentuacao_2caracteres():
+        dados_processados = remove_plurais()
+        
+        if dados_processados is None or not isinstance(dados_processados, pd.DataFrame):
+            return None
+        
+        dados_sem_acentos = dados_processados.copy()
+
+        lista_excecao = [
+            'ac', 'al', 'ap', 'am', 'ba', 'ce', 'df', 'es', 'go', 'ma', 
+            'mt', 'ms', 'mg', 'pa', 'pb', 'pr', 'pe', 'pi', 'rj', 'rn', 
+            'rs', 'ro', 'rr', 'sc', 'sp', 'se', 'to', 'br'
+        ] 
+
+        def remover_acentos(texto):
+            if pd.isna(texto):
+                return texto
+            mapa_acentos = str.maketrans(
+                "áàãâäéèêëíìîïóòõôöúùûüçÁÀÃÂÄÉÈÊËÍÌÎÏÓÒÕÔÖÚÙÛÜÇ",
+                "aaaaaeeeeiiiiooooouuuucAAAAAEEEEIIIIOOOOOUUUUC"
+            )
+            return str(texto).translate(mapa_acentos)
+        
+        regex_com_excecoes = r'\b(?!' + '|'.join(lista_excecao) + r')\w{1,2}\b'
+        
+        for coluna in dados_sem_acentos.columns:
+            if dados_sem_acentos[coluna].dtype == 'object':
+                dados_sem_acentos[coluna] = dados_sem_acentos[coluna].apply(remover_acentos)
+                dados_sem_acentos[coluna] = dados_sem_acentos[coluna].str.replace(regex_com_excecoes, '', regex=True) 
+                dados_sem_acentos[coluna] = dados_sem_acentos[coluna].str.replace(r'\s+', ' ', regex=True).str.strip()
+
+        return dados_sem_acentos
     
+    @output
+    @render.table
+    def tabela_acentuacao_2caracteres():
+        dados = remove_acentuacao_2caracteres()
+        return dados

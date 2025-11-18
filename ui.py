@@ -112,7 +112,7 @@ def create_ui():
                         ),
                         ui.nav_panel(
                             "Remove acentuação e dois caracteres",
-                            "Teste Remove acentuação e dois caracteres",
+                            ui.output_table("tabela_acentuacao_2caracteres"),
                         ),
                     ),
 
