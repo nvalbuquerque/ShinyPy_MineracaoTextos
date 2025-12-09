@@ -464,12 +464,11 @@ def setup_server(input, output, session):
 
         print("DEBUG - colunas do DF:", list(dados_processados.columns))
         
-        if "lema_usados" not in dados_processados.columns:
+        if "Palavra_Lemmatizada" not in dados_processados.columns:
             print("Coluna lemas vazia")
             return None
         
-        # Vamos manter apenas a coluna lema_usados desde o início
-        dados_lematizados = dados_processados[["lema_usados"]].copy()
+        dados_lematizados = dados_processados[["Palavra_Lemmatizada"]].copy()
     
         lista_excecao = [
             'ac', 'al', 'ap', 'am', 'ba', 'ce', 'df', 'es', 'go', 'ma', 
