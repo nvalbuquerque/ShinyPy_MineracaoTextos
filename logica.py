@@ -2,11 +2,10 @@ from shiny import reactive, render, ui
 import pandas as pd
 import string
 import re
-import nltk
-from nltk.stem import SnowballStemmer
 import io
 from datetime import datetime
-
+import nltk
+from nltk.stem.snowball import SnowballStemmer
 from config import load_stopwords
 
 stopwords_data = load_stopwords()
@@ -338,6 +337,16 @@ def setup_server(input, output, session):
         
         return dados_sem_plurais
     
+    @output
+    @render.table
+    def tabela_sem_plural():
+        dados = remove_plurais()
+        
+        if isinstance(dados, pd.DataFrame):
+            return dados
+        else:
+            return None
+    
     # TESTE PARA DOWNLOAD DA TABELA SEM PLURAIS
     @reactive.Calc
     def get_dados_processados():
@@ -365,17 +374,6 @@ def setup_server(input, output, session):
         
         return ui.download_button("download_dados_processados", "📥 Download Dados Processados", class_="btn btn-primary")
     ## FIM TESTE DOWNLOAD
-
-    @output
-    @render.table
-    def tabela_sem_plural():
-        dados = remove_plurais()
-        
-        if isinstance(dados, pd.DataFrame):
-            return dados
-        else:
-            return None
-    
 
     @reactive.Calc    
     def frequencia_absoluta():

@@ -1,10 +1,4 @@
-import nltk
-import requests
-from nltk.corpus import stopwords
-
-NLTK_PACKAGES = ['stopwords', 'punkt']
-
-STOPWORDS_URL = "https://jodavid.github.io/Slide-Introdu-o-a-Web-Scrapping-com-rvest/stopwords_pt_BR.txt"
+import os
 
 CSS_STYLES = """
     /* Texto do input */
@@ -22,7 +16,7 @@ CSS_STYLES = """
     .btn-default .btn-label {
         font-size: 12px !important;
     }
-                      
+
     /* ESTILO PARA TABELAS SHINY */
     .shiny-table {
         width: 100% !important;
@@ -54,8 +48,7 @@ CSS_STYLES = """
         background-color: #e9ecef !important;
         transition: background-color 0.2s ease;
     }
-    
-    /* Container da tabela */
+
     .shiny-table-container {
         max-height: 500px !important;
         overflow-y: auto !important;
@@ -64,7 +57,6 @@ CSS_STYLES = """
         box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
     }
     
-    /* Header fixo para scroll */
     .shiny-table thead th {
         position: sticky !important;
         top: 0 !important;
@@ -72,30 +64,40 @@ CSS_STYLES = """
     }
 """
 
-def download_nltk_data():
-    """Download do NLTK - código original"""
-    for package in NLTK_PACKAGES:
-        try:
-            nltk.data.find(package)
-        except LookupError:
-            print(f"Downloading NLTK package: {package}")
-            nltk.download(package, quiet=True)
+import os
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+DATA_DIR = os.path.join(BASE_DIR, "stopwords")
+
+
+def load_file(filename):
+    """Carrega um arquivo .txt do diretório data e retorna lista de linhas."""
+    path = os.path.join(DATA_DIR, filename)
+    
+    if not os.path.exists(path):
+        print(f"Arquivo não encontrado: {path}")
+        return []
+    
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return [linha.strip() for linha in f if linha.strip()]
+    except Exception as e:
+        print(f"Erro ao ler {filename}: {e}")
+        return []
+
 
 def load_stopwords():
-    """Carrega stopwords - código original"""
-    download_nltk_data()
-    
-    response = requests.get(STOPWORDS_URL)
-    stopwords_ptBR = response.text.splitlines()
-    stopwords_comentarios = stopwords.words('portuguese')
-    stopwords_iso = sorted(stopwords.words('portuguese'))  
-
-    all_stopwords = set(stopwords_comentarios + stopwords_ptBR + list(stopwords_iso))
-    all_stopwords.difference_update(["não", "nao"])
+    """Carrega todas as listas de stopwords dos arquivos locais .txt."""
+    stopwords_ptBR = load_file("stopwords_ptBR.txt")
+    stopwords_comentarios = load_file("stopwords_comentarios.txt")
+    stopwords_iso = load_file("stopwords_iso.txt")
+    all_stopwords = load_file("all_stopwords.txt")
 
     return {
-        'stopwords_ptBR': stopwords_ptBR,
-        'stopwords_comentarios': stopwords_comentarios, 
-        'stopwords_iso': stopwords_iso,
-        'all_stopwords': all_stopwords
+        "stopwords_ptBR": stopwords_ptBR,
+        "stopwords_comentarios": stopwords_comentarios,
+        "stopwords_iso": stopwords_iso,
+        "all_stopwords": all_stopwords,
     }
+
