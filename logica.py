@@ -441,8 +441,8 @@ def setup_server(input, output, session):
                 lemas_usados.append(lemma)
 
         resultado = pd.DataFrame({
-            "Palavra_Representante": palavras_originais,
-            "Lemma_Agrupador": lemas_usados
+            "Palavra Original": palavras_originais,
+            "Palavra Lemmatizada": lemas_usados
         })
 
         return resultado
@@ -482,7 +482,7 @@ def setup_server(input, output, session):
         
         regex_com_excecoes = r'\b(?!' + '|'.join(lista_excecao) + r')\w{1,2}\b'
         
-        for coluna in dados_lematizados.columns:
+        for lemas_usados in dados_lematizados.columns:
             if dados_lematizados[coluna].dtype == 'object':
                 dados_lematizados[coluna] = dados_lematizados[coluna].apply(remover_acentos)
                 dados_lematizados[coluna] = dados_lematizados[coluna].str.replace(regex_com_excecoes, '', regex=True) 
