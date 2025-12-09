@@ -3,3 +3,4 @@ pandas
 requests
 shiny
 jinja2
+spacy
