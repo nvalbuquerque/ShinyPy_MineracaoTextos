@@ -461,11 +461,11 @@ def setup_server(input, output, session):
         if dados_processados is None or not isinstance(dados_processados, pd.DataFrame):
             return None
         
-        # Garante que a coluna existe
         if "lema_usados" not in dados_processados.columns:
             return None
         
-        dados_lematizados = dados_processados.copy()
+        # Vamos manter apenas a coluna lema_usados desde o início
+        dados_lematizados = dados_processados[["lema_usados"]].copy()
     
         lista_excecao = [
             'ac', 'al', 'ap', 'am', 'ba', 'ce', 'df', 'es', 'go', 'ma', 
@@ -484,7 +484,6 @@ def setup_server(input, output, session):
             
         regex_com_excecoes = r'\b(?!' + '|'.join(lista_excecao) + r')\w{1,2}\b'
         
-        # --- AQUI: altera só a coluna lema_usados ---
         col = "lema_usados"
     
         dados_lematizados[col] = (
@@ -494,8 +493,8 @@ def setup_server(input, output, session):
             .str.replace(r'\s+', ' ', regex=True)
             .str.strip()
         )
-        
-        return dados_lematizados[[col]]
+    
+        return dados_lematizados
 
     @output
     @render.table
