@@ -494,7 +494,8 @@ def setup_server(input, output, session):
             .str.replace(r'\s+', ' ', regex=True)
             .str.strip()
         )
-            return dados_lematizados[[col]]
+        
+        return dados_lematizados[[col]]
 
     @output
     @render.table
