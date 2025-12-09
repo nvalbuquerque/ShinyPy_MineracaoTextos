@@ -27,12 +27,6 @@ def create_ui():
                 ),
 
                 ui.page_navbar(
-                    ui.input_text(
-                        "search_global",
-                        "",
-                        placeholder="Buscar..."
-                    ),
-                    
                     ui.nav_panel(
                         "Dados importados",
                         ui.output_text("info_dados"),
