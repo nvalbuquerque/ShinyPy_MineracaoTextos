@@ -7,12 +7,21 @@ from datetime import datetime
 import nltk
 from nltk.stem.snowball import SnowballStemmer
 from config import load_stopwords
+import spacy
+nlp = spacy.load("pt_core_news_sm")
+
 
 stopwords_data = load_stopwords()
 stopwords_ptBR = stopwords_data['stopwords_ptBR']
 stopwords_comentarios = stopwords_data['stopwords_comentarios']
 stopwords_iso = stopwords_data['stopwords_iso']
 all_stopwords = stopwords_data['all_stopwords']
+
+def lemmatizar_texto(texto):
+    if pd.isna(texto):
+        return texto
+    doc = nlp(str(texto))
+    return " ".join([token.lemma_ for token in doc])
 
 
 def setup_server(input, output, session):    
@@ -269,24 +278,50 @@ def setup_server(input, output, session):
     @reactive.Calc
     def remove_stopw_minuscula():
         tabela_editada = conjunto_editavel().get()
-        if not tabela_editada:
-            return remove_repeticao() 
+
+        # Garantir lista
+        if tabela_editada is None:
+            tabela_editada = []
         
+        # Garantir strings
+        tabela_editada = [str(s).strip().lower() for s in tabela_editada if str(s).strip() != ""]
+
+        print("Stopwords recebidas:", tabela_editada)
+
         dados = remove_repeticao()
+
         if dados is None or not isinstance(dados, pd.DataFrame):
+            print("remove_repeticao retornou vazio")
             return None
 
         dados_stopw = dados.copy()
 
-        stopword_regex = r'\b(' + '|'.join(re.escape(s.lower()) for s in tabela_editada) + r')\b'
+        # Não montar regex se stopwords estiverem vazias
+        if len(tabela_editada) == 0:
+            return dados_stopw
+
+        stopword_regex = r'\b(' + '|'.join(map(re.escape, tabela_editada)) + r')\b'
 
         for coluna in dados_stopw.columns:
             if dados_stopw[coluna].dtype == "object":
-                dados_stopw[coluna] = dados_stopw[coluna].str.lower()
-                dados_stopw[coluna] = dados_stopw[coluna].str.replace(stopword_regex, '', regex=True)
-                dados_stopw[coluna] = dados_stopw[coluna].str.replace(r'\s+', ' ', regex=True).str.strip()
+                # Verificar se há texto real
+                if not dados_stopw[coluna].astype(str).str.contains(r"[A-Za-zÀ-ÿ]", regex=True).any():
+                    continue
+
+                dados_stopw[coluna] = (
+                    dados_stopw[coluna]
+                    .astype(str)
+                    .str.lower()
+                    .str.replace(stopword_regex, ' ', regex=True)
+                    .str.replace(r'\s+', ' ', regex=True)
+                    .str.strip()
+                )
+
+        print("Dados após remover stopwords:")
+        print(dados_stopw.head())
 
         return dados_stopw
+
 
     @output
     @render.table
@@ -346,122 +381,33 @@ def setup_server(input, output, session):
             return dados
         else:
             return None
-    
-    # TESTE PARA DOWNLOAD DA TABELA SEM PLURAIS
-    @reactive.Calc
-    def get_dados_processados():
-        """Retorna os dados processados após remove_plurais() para download"""
-        return remove_plurais()
-
-    @session.download(
-        filename=lambda: f"dados_processados_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
-    )
-    def download_dados_processados():
-        """Download dos dados processados finais"""
-        dados = get_dados_processados()
-        if dados is not None and isinstance(dados, pd.DataFrame) and not dados.empty:
-            output = io.StringIO()
-            dados.to_csv(output, index=False, encoding='utf-8')
-            output.seek(0)
-            yield output.getvalue()
-
-    @output
-    @render.ui
-    def ui_download():
-        """Interface para download dos dados processados"""
-        if processa_dados() is None or not isinstance(processa_dados(), pd.DataFrame):
-            return ui.p("Carregue um arquivo para habilitar o download.")
-        
-        return ui.download_button("download_dados_processados", "📥 Download Dados Processados", class_="btn btn-primary")
-    ## FIM TESTE DOWNLOAD
 
     @reactive.Calc    
     def frequencia_absoluta():
-        dados_processados = remove_plurais()
-        
+        dados_processados = remove_stopw_minuscula()  # NÃO precisa mais chamar remove_plurais()
+
         if dados_processados is None or dados_processados.empty:
             print("Dados processados estão vazios.")
-            return []
+            return pd.DataFrame(columns=["Palavra", "Frequência"])
         
-        dados_freq = dados_processados.copy() 
+        dados_freq = dados_processados.copy()
 
+        # Identificar coluna de texto
         coluna_texto = None
         for coluna in dados_freq.columns:
             if dados_freq[coluna].dtype == 'object':
-                coluna_texto = coluna
-                break
-            
+                if dados_freq[coluna].astype(str).str.contains(r"[A-Za-zÀ-ÿ]", regex=True).any():
+                    coluna_texto = coluna
+                    break
+
+
         if coluna_texto is None:
             print("Nenhuma coluna de texto encontrada para análise de frequência.")
-            return []
+            return pd.DataFrame(columns=["Palavra", "Frequência"])
 
-        dados_freq = (
-            dados_freq[coluna_texto]
-            .dropna()
-            .str.split()
-            .explode()
-            .str.lower()
-            .value_counts()
-            .reset_index()
-        )
+        dados_freq[coluna_texto] = dados_freq[coluna_texto].apply(lemmatizar_texto)
 
-        dados_freq.columns = ['Palavra', 'Frequência']
-        dados_freq = dados_freq.sort_values(by='Frequência', ascending=False).reset_index(drop=True)
-        
-        #return dados_freq
-        return list(dados_freq.itertuples(index=False, name=None))
-
-    ###### verificar se o stem existe dentro do shiny!!!!
-    @reactive.Calc
-    def elege_representante():
-        dados_freq = frequencia_absoluta()
-
-        stemmer = SnowballStemmer('portuguese')
-
-        palavras_originais = []
-        stems = []
-
-        for palavra, frequencia in dados_freq:
-            stem = stemmer.stem(palavra)
-
-            if stem not in stems:
-                palavras_originais.append(palavra)
-                stems.append(stem)
-
-        # adicionar uma verificacao de palavra original, palavra representante e stem
-        resultado = pd.DataFrame({
-            "Palavra_Representante": palavras_originais,
-            "Stem_Agrupador": stems
-        })
-
-        return resultado
-
-    @output
-    @render.table
-    def tabela_elege_representante():
-        dados = elege_representante()
-        return dados
-
-    
-    '''
-    @reactive.Calc    
-    def frequencia_absoluta():
-        dados_processados = remove_plurais()
-        
-        if dados_processados is None or dados_processados.empty:
-            return [pd.DataFrame(columns=['Palavra', 'Frequência'])]
-        
-        dados_freq = dados_processados.copy() 
-
-        coluna_texto = None
-        for coluna in dados_freq.columns:
-            if dados_freq[coluna].dtype == 'object':
-                coluna_texto = coluna
-                break
-            
-        if coluna_texto is None:
-            return pd.DataFrame(columns=['Palavra', 'Frequência'])
-
+        # Explodir e contar palavras
         dados_freq = (
             dados_freq[coluna_texto]
             .dropna()
@@ -477,53 +423,55 @@ def setup_server(input, output, session):
         
         return dados_freq
 
+
     @reactive.Calc
     def elege_representante():
         dados_freq = frequencia_absoluta()
 
         if dados_freq is None or dados_freq.empty:
-            return pd.DataFrame(columns=["Palavra_Representante", "Stem_Agrupador"])
-
-        stemmer = SnowballStemmer('portuguese')
+            return pd.DataFrame(columns=["Palavra_Representante", "Lemma_Agrupador"])
 
         palavras_originais = []
-        stems = []
+        lemas_usados = []
 
         for _, row in dados_freq.iterrows():
-            palavra = row['Palavra']
-            stem = stemmer.stem(palavra)
+            palavra = row["Palavra"]
+            
+            # Lematizar palavra individual
+            lemma = nlp(palavra)[0].lemma_.lower()
+            palavra_lower = palavra.lower()
 
-            # só adiciona se esse stem ainda não estiver na lista
-            if stem not in stems:
-                palavras_originais.append(palavra)
-                stems.append(stem)
+            if lemma not in lemas_usados:
+                palavras_originais.append(palavra_lower)
+                lemas_usados.append(lemma)
 
         resultado = pd.DataFrame({
             "Palavra_Representante": palavras_originais,
-            "Stem_Agrupador": stems
+            "Lemma_Agrupador": lemas_usados
         })
 
         return resultado
+
 
     @output
     @render.table
     def tabela_elege_representante():
         dados = elege_representante()
+        return dados
 
-    '''
     @reactive.Calc
     def remove_acentuacao_2caracteres():
-        dados_processados = remove_plurais()
+        dados_processados = elege_representante()
         
         if dados_processados is None or not isinstance(dados_processados, pd.DataFrame):
             return None
         
-        dados_sem_acentos = dados_processados.copy()
+        dados_lematizados = dados_processados.copy()
 
         lista_excecao = [
             'ac', 'al', 'ap', 'am', 'ba', 'ce', 'df', 'es', 'go', 'ma', 
             'mt', 'ms', 'mg', 'pa', 'pb', 'pr', 'pe', 'pi', 'rj', 'rn', 
-            'rs', 'ro', 'rr', 'sc', 'sp', 'se', 'to', 'br'
+            'rs', 'ro', 'rr', 'sc', 'sp', 'se', 'to', 'br', 'ir', 'km', 'ar'
         ] 
 
         def remover_acentos(texto):
@@ -537,13 +485,13 @@ def setup_server(input, output, session):
         
         regex_com_excecoes = r'\b(?!' + '|'.join(lista_excecao) + r')\w{1,2}\b'
         
-        for coluna in dados_sem_acentos.columns:
-            if dados_sem_acentos[coluna].dtype == 'object':
-                dados_sem_acentos[coluna] = dados_sem_acentos[coluna].apply(remover_acentos)
-                dados_sem_acentos[coluna] = dados_sem_acentos[coluna].str.replace(regex_com_excecoes, '', regex=True) 
-                dados_sem_acentos[coluna] = dados_sem_acentos[coluna].str.replace(r'\s+', ' ', regex=True).str.strip()
+        for coluna in dados_lematizados.columns:
+            if dados_lematizados[coluna].dtype == 'object':
+                dados_lematizados[coluna] = dados_lematizados[coluna].apply(remover_acentos)
+                dados_lematizados[coluna] = dados_lematizados[coluna].str.replace(regex_com_excecoes, '', regex=True) 
+                dados_lematizados[coluna] = dados_lematizados[coluna].str.replace(r'\s+', ' ', regex=True).str.strip()
 
-        return dados_sem_acentos
+        return dados_lematizados
     
     @output
     @render.table

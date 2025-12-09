@@ -92,21 +92,6 @@ def create_ui():
                             ui.output_table("tabela_sem_plural"),
                         ),
                         ui.nav_panel(
-                            "Download",
-                            ui.div(
-                                ui.h3("Download Retira Plural"),
-                                ui.p("Faça o download dos dados após todo o processamento:"),
-                                ui.hr(),
-                                ui.output_ui("ui_download"),
-                                ui.br(),
-                                ui.div(
-                                    ui.h5("Informações:"),
-                                    ui.p("• Contém: Dados após remoção de pontuação, números, repetição e plurais"),
-                                    style="background-color: #f8f9fa; padding: 15px; border-radius: 5px;"
-                                )
-                            ),
-                        ),
-                        ui.nav_panel(
                             "Elege representante",
                             ui.output_table("tabela_elege_representante"),
                         ),
