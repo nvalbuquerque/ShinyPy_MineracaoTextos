@@ -454,23 +454,25 @@ def setup_server(input, output, session):
         dados = elege_representante()
         return dados
 
-    @reactive.Calc
+    @reactive.Calc 
     def remove_acentuacao_2caracteres():
         dados_processados = elege_representante()
         
         if dados_processados is None or not isinstance(dados_processados, pd.DataFrame):
             return None
         
+        # Garante que a coluna existe
+        if "lema_usados" not in dados_processados.columns:
+            return None
+        
         dados_lematizados = dados_processados.copy()
-
-        # tornar a lista de exceção editável para o usuario definir
-
+    
         lista_excecao = [
             'ac', 'al', 'ap', 'am', 'ba', 'ce', 'df', 'es', 'go', 'ma', 
             'mt', 'ms', 'mg', 'pa', 'pb', 'pr', 'pe', 'pi', 'rj', 'rn', 
             'rs', 'ro', 'rr', 'sc', 'sp', 'se', 'to', 'br', 'ir', 'km', 'ar'
         ]
-
+    
         def remover_acentos(texto):
             if pd.isna(texto):
                 return texto
@@ -479,17 +481,21 @@ def setup_server(input, output, session):
                 "aaaaaeeeeiiiiooooouuuucAAAAAEEEEIIIIOOOOOUUUUC"
             )
             return str(texto).translate(mapa_acentos)
-        
+            
         regex_com_excecoes = r'\b(?!' + '|'.join(lista_excecao) + r')\w{1,2}\b'
         
-        for lemas_usados in dados_lematizados.columns:
-            if dados_lematizados[lemas_usados].dtype == 'object':
-                dados_lematizados[lemas_usados] = dados_lematizados[lemas_usados].apply(remover_acentos)
-                dados_lematizados[lemas_usados] = dados_lematizados[lemas_usados].str.replace(regex_com_excecoes, '', regex=True) 
-                dados_lematizados[lemas_usados] = dados_lematizados[lemas_usados].str.replace(r'\s+', ' ', regex=True).str.strip()
-
-        return dados_lematizados
+        # --- AQUI: altera só a coluna lema_usados ---
+        col = "lema_usados"
     
+        dados_lematizados[col] = (
+            dados_lematizados[col]
+            .apply(remover_acentos)
+            .str.replace(regex_com_excecoes, '', regex=True)
+            .str.replace(r'\s+', ' ', regex=True)
+            .str.strip()
+        )
+            return dados_lematizados[[col]]
+
     @output
     @render.table
     def tabela_acentuacao_2caracteres():
