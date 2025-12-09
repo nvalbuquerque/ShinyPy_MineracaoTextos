@@ -496,8 +496,13 @@ def setup_server(input, output, session):
             .str.replace(r'\s+', ' ', regex=True)
             .str.strip()
         )
-    
-        return dados_lematizados
+
+        resultado = dados_lematizados.rename(columns={
+            "Palavra_Original": "Palavra_Original",
+            "Palavra_Lemmatizada": "Palavra_semAcento_2Caracteres"
+        })
+
+        return resultado
 
     @output
     @render.table
