@@ -441,8 +441,8 @@ def setup_server(input, output, session):
                 lemas_usados.append(lemma)
 
         resultado = pd.DataFrame({
-            "Palavra Original": palavras_originais,
-            "Palavra Lemmatizada": lemas_usados
+            "Palavra_Original": palavras_originais,
+            "Palavra_Lemmatizada": lemas_usados
         })
 
         return resultado
@@ -488,7 +488,7 @@ def setup_server(input, output, session):
             
         regex_com_excecoes = r'\b(?!' + '|'.join(lista_excecao) + r')\w{1,2}\b'
         
-        col = "lema_usados"
+        col = "Palavra_Lemmatizada"
     
         dados_lematizados[col] = (
             dados_lematizados[col]
