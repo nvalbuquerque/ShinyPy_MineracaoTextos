@@ -468,7 +468,7 @@ def setup_server(input, output, session):
             print("Coluna lemas vazia")
             return None
         
-        dados_lematizados = dados_processados[["Palavra_Lemmatizada"]].copy()
+        dados_lematizados = dados_processados.copy()
     
         lista_excecao = [
             'ac', 'al', 'ap', 'am', 'ba', 'ce', 'df', 'es', 'go', 'ma', 
