@@ -279,11 +279,9 @@ def setup_server(input, output, session):
     def remove_stopw_minuscula():
         tabela_editada = conjunto_editavel().get()
 
-        # Garantir lista
         if tabela_editada is None:
             tabela_editada = []
         
-        # Garantir strings
         tabela_editada = [str(s).strip().lower() for s in tabela_editada if str(s).strip() != ""]
 
         print("Stopwords recebidas:", tabela_editada)
@@ -304,7 +302,6 @@ def setup_server(input, output, session):
 
         for coluna in dados_stopw.columns:
             if dados_stopw[coluna].dtype == "object":
-                # Verificar se há texto real
                 if not dados_stopw[coluna].astype(str).str.contains(r"[A-Za-zÀ-ÿ]", regex=True).any():
                     continue
 
@@ -384,7 +381,7 @@ def setup_server(input, output, session):
 
     @reactive.Calc    
     def frequencia_absoluta():
-        dados_processados = remove_stopw_minuscula()  # NÃO precisa mais chamar remove_plurais()
+        dados_processados = remove_stopw_minuscula()  # n precisa mais remove_plurais()
 
         if dados_processados is None or dados_processados.empty:
             print("Dados processados estão vazios.")
@@ -392,7 +389,6 @@ def setup_server(input, output, session):
         
         dados_freq = dados_processados.copy()
 
-        # Identificar coluna de texto
         coluna_texto = None
         for coluna in dados_freq.columns:
             if dados_freq[coluna].dtype == 'object':
@@ -437,7 +433,6 @@ def setup_server(input, output, session):
         for _, row in dados_freq.iterrows():
             palavra = row["Palavra"]
             
-            # Lematizar palavra individual
             lemma = nlp(palavra)[0].lemma_.lower()
             palavra_lower = palavra.lower()
 
@@ -468,11 +463,13 @@ def setup_server(input, output, session):
         
         dados_lematizados = dados_processados.copy()
 
+        # tornar a lista de exceção editável para o usuario definir
+
         lista_excecao = [
             'ac', 'al', 'ap', 'am', 'ba', 'ce', 'df', 'es', 'go', 'ma', 
             'mt', 'ms', 'mg', 'pa', 'pb', 'pr', 'pe', 'pi', 'rj', 'rn', 
             'rs', 'ro', 'rr', 'sc', 'sp', 'se', 'to', 'br', 'ir', 'km', 'ar'
-        ] 
+        ]
 
         def remover_acentos(texto):
             if pd.isna(texto):
