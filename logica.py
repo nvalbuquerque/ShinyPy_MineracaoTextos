@@ -483,10 +483,10 @@ def setup_server(input, output, session):
         regex_com_excecoes = r'\b(?!' + '|'.join(lista_excecao) + r')\w{1,2}\b'
         
         for lemas_usados in dados_lematizados.columns:
-            if dados_lematizados[coluna].dtype == 'object':
-                dados_lematizados[coluna] = dados_lematizados[coluna].apply(remover_acentos)
-                dados_lematizados[coluna] = dados_lematizados[coluna].str.replace(regex_com_excecoes, '', regex=True) 
-                dados_lematizados[coluna] = dados_lematizados[coluna].str.replace(r'\s+', ' ', regex=True).str.strip()
+            if dados_lematizados[lemas_usados].dtype == 'object':
+                dados_lematizados[lemas_usados] = dados_lematizados[lemas_usados].apply(remover_acentos)
+                dados_lematizados[lemas_usados] = dados_lematizados[lemas_usados].str.replace(regex_com_excecoes, '', regex=True) 
+                dados_lematizados[lemas_usados] = dados_lematizados[lemas_usados].str.replace(r'\s+', ' ', regex=True).str.strip()
 
         return dados_lematizados
     
