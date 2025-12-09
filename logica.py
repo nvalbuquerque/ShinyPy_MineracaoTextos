@@ -459,10 +459,12 @@ def setup_server(input, output, session):
         dados_processados = elege_representante()
         
         if dados_processados is None or not isinstance(dados_processados, pd.DataFrame):
-            return "Df vazio"
+            print("Df vazio")
+            return None
         
         if "lema_usados" not in dados_processados.columns:
-            return "Coluna lemas vazia"
+            print("Coluna lemas vazia")
+            return None
         
         # Vamos manter apenas a coluna lema_usados desde o início
         dados_lematizados = dados_processados[["lema_usados"]].copy()
