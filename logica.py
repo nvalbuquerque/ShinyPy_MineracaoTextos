@@ -495,8 +495,8 @@ def setup_server(input, output, session):
                 lemas_usados.append(lemma)
 
         resultado = pd.DataFrame({
-            "Palavra_Representante": palavras_originais,
-            "Lemma_Agrupador": lemas_usados
+            "Palavra_Original": palavras_originais,
+            "Palavra_Lemmatizada": lemas_usados
         })
 
         return resultado
@@ -508,23 +508,28 @@ def setup_server(input, output, session):
         dados = elege_representante()
         return dados
 
-    @reactive.Calc
+    @reactive.Calc 
     def remove_acentuacao_2caracteres():
         dados_processados = elege_representante()
         
         if dados_processados is None or not isinstance(dados_processados, pd.DataFrame):
+            print("Df vazio")
+            return None
+
+        print("DEBUG - colunas do DF:", list(dados_processados.columns))
+        
+        if "Palavra_Lemmatizada" not in dados_processados.columns:
+            print("Coluna lemas vazia")
             return None
         
         dados_lematizados = dados_processados.copy()
-
-        # tornar a lista de exceção editável para o usuario definir
-
+    
         lista_excecao = [
             'ac', 'al', 'ap', 'am', 'ba', 'ce', 'df', 'es', 'go', 'ma', 
             'mt', 'ms', 'mg', 'pa', 'pb', 'pr', 'pe', 'pi', 'rj', 'rn', 
             'rs', 'ro', 'rr', 'sc', 'sp', 'se', 'to', 'br', 'ir', 'km', 'ar'
         ]
-
+    
         def remover_acentos(texto):
             if pd.isna(texto):
                 return texto
@@ -533,17 +538,26 @@ def setup_server(input, output, session):
                 "aaaaaeeeeiiiiooooouuuucAAAAAEEEEIIIIOOOOOUUUUC"
             )
             return str(texto).translate(mapa_acentos)
-        
+            
         regex_com_excecoes = r'\b(?!' + '|'.join(lista_excecao) + r')\w{1,2}\b'
         
-        for coluna in dados_lematizados.columns:
-            if dados_lematizados[coluna].dtype == 'object':
-                dados_lematizados[coluna] = dados_lematizados[coluna].apply(remover_acentos)
-                dados_lematizados[coluna] = dados_lematizados[coluna].str.replace(regex_com_excecoes, '', regex=True) 
-                dados_lematizados[coluna] = dados_lematizados[coluna].str.replace(r'\s+', ' ', regex=True).str.strip()
-
-        return dados_lematizados
+        col = "Palavra_Lemmatizada"
     
+        dados_lematizados[col] = (
+            dados_lematizados[col]
+            .apply(remover_acentos)
+            .str.replace(regex_com_excecoes, '', regex=True)
+            .str.replace(r'\s+', ' ', regex=True)
+            .str.strip()
+        )
+
+        resultado = dados_lematizados.rename(columns={
+            "Palavra_Original": "Palavra_Original",
+            "Palavra_Lemmatizada": "Palavra_semAcento_2Caracteres"
+        })
+
+        return resultado
+
     @output
     @render.table
     def tabela_acentuacao_2caracteres():
