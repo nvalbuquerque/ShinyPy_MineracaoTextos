@@ -103,7 +103,9 @@ def create_ui():
 
                     ui.nav_menu(
                         "Tabela de Frequência",
-                        ui.nav_panel("Palavras", "Teste Palavras"),
+                        ui.nav_panel(
+                            "Palavras", 
+                            ui.output_table("tabela_frequencia")),
                         ui.nav_panel("Bigramas", "Teste Bigramas"),
                         ui.nav_panel("Trigramas", "Teste Trigramas"),
                         ui.nav_panel("Tetragramas", "Teste Tetragramas"),

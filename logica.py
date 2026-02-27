@@ -8,7 +8,8 @@ import nltk
 from nltk.stem.snowball import SnowballStemmer
 from config import load_stopwords
 import spacy
-nlp = spacy.load("pt_core_news_sm")
+# Biblioteca média de língua portuguesa no spaCy
+nlp = spacy.load("pt_core_news_md")
 
 
 stopwords_data = load_stopwords()
@@ -127,6 +128,10 @@ def setup_server(input, output, session):
         
         else:
             return "Tipo de dado não reconhecido"
+    
+    ########################
+    # STOPWORDS
+    #########################
 
     @output 
     @render.text
@@ -221,13 +226,20 @@ def setup_server(input, output, session):
     def atualizar_visualizacoes():
         pass
 
+    ########################
+    # PRÉ-PROCESSAMENTO
+    #########################
+
     def remove_pontuacao_numeros(df):
         if isinstance(df, pd.DataFrame):
             df_limpo = df.copy()
             for coluna in df_limpo.columns:
                 if df_limpo[coluna].dtype == 'object':
+                    '''Quebra de linha do espaço'''
                     df_limpo[coluna] = df_limpo[coluna].str.replace('\n', ' ', regex=False)
+                    '''Remove caracteres especiais (tudo que nao for letra, número ou espaço)'''
                     df_limpo[coluna] = df_limpo[coluna].str.replace(r'[^\w\s]', ' ', regex=True)
+                    '''Remove números'''
                     df_limpo[coluna] = df_limpo[coluna].str.replace(r'\d+', '', regex=True)
             return df_limpo
         return None
@@ -254,6 +266,7 @@ def setup_server(input, output, session):
 
             for coluna in dados_limpo.columns:
                 if dados_limpo[coluna].dtype == 'object':
+                    '''Remove caracteres repetidos'''
                     dados_limpo[coluna] = dados_limpo[coluna].apply(
                         lambda x: re.sub(r"([^RSrs])\1+|R{3,}|S{3,}|r{3,}|s{3,}", 
                             lambda m: m.group(0)[0:2] if m.group(0)[0] in "RrSs" else m.group(0)[0], 
@@ -298,13 +311,16 @@ def setup_server(input, output, session):
         if len(tabela_editada) == 0:
             return dados_stopw
 
+        '''Ajusta lista stopwords garantindo remoção apenas de palavras inteiras'''
         stopword_regex = r'\b(' + '|'.join(map(re.escape, tabela_editada)) + r')\b'
 
         for coluna in dados_stopw.columns:
             if dados_stopw[coluna].dtype == "object":
+                '''Só processa colunas que contenham texto'''
                 if not dados_stopw[coluna].astype(str).str.contains(r"[A-Za-zÀ-ÿ]", regex=True).any():
                     continue
 
+                '''Remove stopwords, converte para minúsculo, remove espaços extras'''
                 dados_stopw[coluna] = (
                     dados_stopw[coluna]
                     .astype(str)
@@ -379,9 +395,47 @@ def setup_server(input, output, session):
         else:
             return None
 
+    def calcular_frequencia(df):
+
+        if df is None or df.empty:
+            return pd.DataFrame(columns=["Palavra", "Frequência"])
+
+        dados_freq = df.copy()
+
+        coluna_texto = None
+        for coluna in dados_freq.columns:
+            if dados_freq[coluna].dtype == 'object':
+                if dados_freq[coluna].astype(str).str.contains(r"[A-Za-zÀ-ÿ]", regex=True).any():
+                    coluna_texto = coluna
+                    break
+
+        if coluna_texto is None:
+            return pd.DataFrame(columns=["Palavra", "Frequência"])
+
+        dados_freq[coluna_texto] = dados_freq[coluna_texto].apply(lemmatizar_texto)
+
+        dados_freq = (
+            dados_freq[coluna_texto]
+            .dropna()
+            .str.split()
+            .explode()
+            .str.lower()
+            .value_counts()
+            .reset_index()
+        )
+
+        dados_freq.columns = ['Palavra', 'Frequência']
+        return dados_freq.sort_values(by='Frequência', ascending=False).reset_index(drop=True)
+    
+    @reactive.Calc
+    def frequencia_absoluta():
+        dados_processados = remove_plurais()
+        return calcular_frequencia(dados_processados)
+
+    '''
     @reactive.Calc    
     def frequencia_absoluta():
-        dados_processados = remove_stopw_minuscula()  # n precisa mais remove_plurais()
+        dados_processados = remove_plurais()  # essa função é redundante com remove plur
 
         if dados_processados is None or dados_processados.empty:
             print("Dados processados estão vazios.")
@@ -418,7 +472,7 @@ def setup_server(input, output, session):
         dados_freq = dados_freq.sort_values(by='Frequência', ascending=False).reset_index(drop=True)
         
         return dados_freq
-
+    '''
 
     @reactive.Calc
     def elege_representante():
@@ -495,3 +549,12 @@ def setup_server(input, output, session):
     def tabela_acentuacao_2caracteres():
         dados = remove_acentuacao_2caracteres()
         return dados
+    
+    ########################
+    # TABELA DE FREQUÊNCIA
+    #########################
+
+    @output
+    @render.table
+    def tabela_frequencia():
+        return calcular_frequencia(remove_acentuacao_2caracteres())
