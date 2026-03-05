@@ -88,17 +88,14 @@ def create_ui():
                             ui.output_table("tabela_sem_stopwords_minuscula"),
                         ),
                         ui.nav_panel(
-                            "Retira plural",
-                            ui.output_table("tabela_sem_plural"),
+                            "Remove acentuação e dois caracteres",
+                            ui.output_table("tabela_acentuacao_2caracteres"),
                         ),
                         ui.nav_panel(
                             "Elege representante",
                             ui.output_table("tabela_elege_representante"),
                         ),
-                        ui.nav_panel(
-                            "Remove acentuação e dois caracteres",
-                            ui.output_table("tabela_acentuacao_2caracteres"),
-                        ),
+                        
                     ),
 
                     ui.nav_menu(

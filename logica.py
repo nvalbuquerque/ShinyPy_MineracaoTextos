@@ -11,19 +11,11 @@ import spacy
 # Biblioteca média de língua portuguesa no spaCy
 nlp = spacy.load("pt_core_news_md")
 
-
 stopwords_data = load_stopwords()
 stopwords_ptBR = stopwords_data['stopwords_ptBR']
 stopwords_comentarios = stopwords_data['stopwords_comentarios']
 stopwords_iso = stopwords_data['stopwords_iso']
 all_stopwords = stopwords_data['all_stopwords']
-
-def lemmatizar_texto(texto):
-    if pd.isna(texto):
-        return texto
-    doc = nlp(str(texto))
-    return " ".join([token.lemma_ for token in doc])
-
 
 def setup_server(input, output, session):    
     @reactive.Calc  
@@ -344,185 +336,49 @@ def setup_server(input, output, session):
             return dados
         else:
             return None
-
-    def remover_plurais_texto(texto):
+        
+    def lemmatizar_texto(texto):
         if pd.isna(texto):
             return texto
-        
-        excecoes = {'variáveis': 'variável', 'tangíveis': 'tangível', 'simples': 'simples', 'mais': 'mais', 'ônibus': 'ônibus', 'cais': 'cais', 'atlas': 'atlas', 'campus': 'campus', 'bônus': 'bônus', 'status': 'status', 'lápis': 'lápis'}
-        
-        palavras = str(texto).split()
-        resultado = []
-        
-        for palavra in palavras:
-            if palavra in excecoes:
-                resultado.append(excecoes[palavra])
-            elif palavra.endswith('s'):
-                if palavra.endswith(('ões', 'ãos', 'ães')): resultado.append(palavra[:-3] + 'ão')
-                elif palavra.endswith('zes'): resultado.append(palavra[:-2])
-                elif palavra.endswith('res'): resultado.append(palavra[:-2])
-                elif palavra.endswith('ais'): resultado.append(palavra[:-2] + 'l')
-                elif palavra.endswith('ns'): resultado.append(palavra[:-2] + 'm')
-                elif palavra.endswith(('os', 'as', 'es')): resultado.append(palavra[:-1])
-                else: resultado.append(palavra)
-            else:
-                resultado.append(palavra)
-        
-        return ' '.join(resultado)
+        doc = nlp(str(texto))
+        return " ".join([token.lemma_ for token in doc])
 
     @reactive.Calc
-    def remove_plurais():
-        dados_processados = remove_stopw_minuscula()
-        
-        if dados_processados is None or not isinstance(dados_processados, pd.DataFrame):
-            return None
-        
-        dados_sem_plurais = dados_processados.copy()
-        
-        for coluna in dados_sem_plurais.columns:
-            if dados_sem_plurais[coluna].dtype == 'object':
-                dados_sem_plurais[coluna] = dados_sem_plurais[coluna].apply(remover_plurais_texto)
-        
-        return dados_sem_plurais
-    
-    @output
-    @render.table
-    def tabela_sem_plural():
-        dados = remove_plurais()
-        
-        if isinstance(dados, pd.DataFrame):
-            return dados
-        else:
+    def texto_lemmatizado():
+        dados = remove_stopw_minuscula()
+
+        if dados is None or dados.empty:
             return None
 
-    def calcular_frequencia(df):
+        col = "coments"  # ou sua coluna textual
 
-        if df is None or df.empty:
-            return pd.DataFrame(columns=["Palavra", "Frequência"])
+        dados[col] = dados[col].apply(lemmatizar_texto)
 
-        dados_freq = df.copy()
-
-        coluna_texto = None
-        for coluna in dados_freq.columns:
-            if dados_freq[coluna].dtype == 'object':
-                if dados_freq[coluna].astype(str).str.contains(r"[A-Za-zÀ-ÿ]", regex=True).any():
-                    coluna_texto = coluna
-                    break
-
-        if coluna_texto is None:
-            return pd.DataFrame(columns=["Palavra", "Frequência"])
-
-        dados_freq[coluna_texto] = dados_freq[coluna_texto].apply(lemmatizar_texto)
-
-        dados_freq = (
-            dados_freq[coluna_texto]
-            .dropna()
-            .str.split()
-            .explode()
-            .str.lower()
-            .value_counts()
-            .reset_index()
-        )
-
-        dados_freq.columns = ['Palavra', 'Frequência']
-        return dados_freq.sort_values(by='Frequência', ascending=False).reset_index(drop=True)
-    
-    @reactive.Calc
-    def frequencia_absoluta():
-        dados_processados = remove_plurais()
-        return calcular_frequencia(dados_processados)
-
-    '''
-    @reactive.Calc    
-    def frequencia_absoluta():
-        dados_processados = remove_plurais()  # essa função é redundante com remove plur
-
-        if dados_processados is None or dados_processados.empty:
-            print("Dados processados estão vazios.")
-            return pd.DataFrame(columns=["Palavra", "Frequência"])
-        
-        dados_freq = dados_processados.copy()
-
-        coluna_texto = None
-        for coluna in dados_freq.columns:
-            if dados_freq[coluna].dtype == 'object':
-                if dados_freq[coluna].astype(str).str.contains(r"[A-Za-zÀ-ÿ]", regex=True).any():
-                    coluna_texto = coluna
-                    break
-
-
-        if coluna_texto is None:
-            print("Nenhuma coluna de texto encontrada para análise de frequência.")
-            return pd.DataFrame(columns=["Palavra", "Frequência"])
-
-        dados_freq[coluna_texto] = dados_freq[coluna_texto].apply(lemmatizar_texto)
-
-        # Explodir e contar palavras
-        dados_freq = (
-            dados_freq[coluna_texto]
-            .dropna()
-            .str.split()
-            .explode()
-            .str.lower()
-            .value_counts()
-            .reset_index()
-        )
-
-        dados_freq.columns = ['Palavra', 'Frequência']
-        dados_freq = dados_freq.sort_values(by='Frequência', ascending=False).reset_index(drop=True)
-        
-        return dados_freq
-    '''
-
-    @reactive.Calc
-    def elege_representante():
-        dados_freq = frequencia_absoluta()
-
-        if dados_freq is None or dados_freq.empty:
-            return pd.DataFrame(columns=["Palavra_Representante", "Lemma_Agrupador"])
-
-        palavras_originais = []
-        lemas_usados = []
-
-        for _, row in dados_freq.iterrows():
-            palavra = row["Palavra"]
-            
-            lemma = nlp(palavra)[0].lemma_.lower()
-            palavra_lower = palavra.lower()
-
-            if lemma not in lemas_usados:
-                palavras_originais.append(palavra_lower)
-                lemas_usados.append(lemma)
-
-        resultado = pd.DataFrame({
-            "Palavra_Original": palavras_originais,
-            "Palavra_Lemmatizada": lemas_usados
-        })
-
-        return resultado
-
-
-    @output
-    @render.table
-    def tabela_elege_representante():
-        dados = elege_representante()
         return dados
-
+        
     @reactive.Calc 
     def remove_acentuacao_2caracteres():
-        dados_processados = elege_representante()
+        dados_processados = texto_lemmatizado()
         
+        print(dados_processados.head())
+
         if dados_processados is None or not isinstance(dados_processados, pd.DataFrame):
             print("Df vazio")
             return None
 
         print("DEBUG - colunas do DF:", list(dados_processados.columns))
         
-        if "Palavra_Lemmatizada" not in dados_processados.columns:
-            print("Coluna lemas vazia")
+        colunas_texto = dados_processados.select_dtypes(
+            include=['object', 'string']
+        ).columns.tolist()
+
+        colunas_texto = [c for c in colunas_texto if c.lower() != 'id']
+
+        if len(colunas_texto) == 0:
+            print("Nenhuma coluna textual válida encontrada")
             return None
         
-        dados_lematizados = dados_processados.copy()
+        col = colunas_texto[0]
     
         lista_excecao = [
             'ac', 'al', 'ap', 'am', 'ba', 'ce', 'df', 'es', 'go', 'ma', 
@@ -540,28 +396,69 @@ def setup_server(input, output, session):
             return str(texto).translate(mapa_acentos)
             
         regex_com_excecoes = r'\b(?!' + '|'.join(lista_excecao) + r')\w{1,2}\b'
-        
-        col = "Palavra_Lemmatizada"
-    
-        dados_lematizados[col] = (
-            dados_lematizados[col]
+            
+        coluna_tratada = (
+            dados_processados[col]
             .apply(remover_acentos)
             .str.replace(regex_com_excecoes, '', regex=True)
             .str.replace(r'\s+', ' ', regex=True)
             .str.strip()
         )
 
-        resultado = dados_lematizados.rename(columns={
-            "Palavra_Original": "Palavra_Original",
-            "Palavra_Lemmatizada": "Palavra_semAcento_2Caracteres"
+        return pd.DataFrame({
+            "Sem acento e 2 caracteres": coluna_tratada
         })
-
-        return resultado
 
     @output
     @render.table
     def tabela_acentuacao_2caracteres():
         dados = remove_acentuacao_2caracteres()
+        return dados
+
+    def calcular_frequencia(df):
+
+        if df is None or df.empty:
+            return pd.DataFrame(columns=["Palavra", "Frequência"])
+
+        coluna = df.columns[0]
+
+        dados_freq = (
+            df[coluna]
+            .dropna()
+            .str.split()
+            .explode()
+            .str.lower()
+            .value_counts()
+            .reset_index()
+        )
+
+        dados_freq.columns = ['Palavra', 'Frequência']
+
+        return dados_freq.sort_values(
+            by='Frequência',
+            ascending=False
+    ).reset_index(drop=True)
+
+    @reactive.Calc
+    def frequencia_absoluta():
+        dados_processados = remove_acentuacao_2caracteres()
+        return calcular_frequencia(dados_processados)
+
+    @reactive.Calc
+    def elege_representante():
+        freq = frequencia_absoluta()
+
+        if freq is None or freq.empty:
+            return pd.DataFrame(columns=["Palavra_Lemmatizada"])
+
+        return pd.DataFrame({
+            "Palavra_Lemmatizada": freq["Palavra"]
+        })
+
+    @output
+    @render.table
+    def tabela_elege_representante():
+        dados = elege_representante()
         return dados
     
     ########################
