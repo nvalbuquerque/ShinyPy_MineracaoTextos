@@ -10,6 +10,9 @@ from config import load_stopwords
 import spacy
 # Biblioteca média de língua portuguesa no spaCy
 nlp = spacy.load("pt_core_news_md")
+import matplotlib.pyplot as plt
+import seaborn as sns
+from wordcloud import WordCloud
 
 stopwords_data = load_stopwords()
 stopwords_ptBR = stopwords_data['stopwords_ptBR']
@@ -221,20 +224,34 @@ def setup_server(input, output, session):
     ########################
     # PRÉ-PROCESSAMENTO
     #########################
+    import pandas as pd
 
     def remove_pontuacao_numeros(df):
-        if isinstance(df, pd.DataFrame):
-            df_limpo = df.copy()
-            for coluna in df_limpo.columns:
-                if df_limpo[coluna].dtype == 'object':
-                    '''Quebra de linha do espaço'''
-                    df_limpo[coluna] = df_limpo[coluna].str.replace('\n', ' ', regex=False)
-                    '''Remove caracteres especiais (tudo que nao for letra, número ou espaço)'''
-                    df_limpo[coluna] = df_limpo[coluna].str.replace(r'[^\w\s]', ' ', regex=True)
-                    '''Remove números'''
-                    df_limpo[coluna] = df_limpo[coluna].str.replace(r'\d+', '', regex=True)
-            return df_limpo
-        return None
+        if not isinstance(df, pd.DataFrame):
+            return None
+
+        df_limpo = df.copy()
+
+        # Seleciona todas as colunas de texto
+        colunas_texto = df_limpo.select_dtypes(include=['object', 'string']).columns
+
+        for coluna in colunas_texto:
+            # Força string
+            df_limpo[coluna] = df_limpo[coluna].astype(str)
+            # Quebra de linha do espaço
+            df_limpo[coluna] = df_limpo[coluna].str.replace('\n', ' ', regex=False)
+            # Remove caracteres especiais (mantendo letras acentuadas e espaços)
+            df_limpo[coluna] = df_limpo[coluna].str.replace(r'[^A-Za-zÀ-ÿ\s]', ' ', regex=True)
+            # Remove números
+            df_limpo[coluna] = df_limpo[coluna].str.replace(r'\d+', '', regex=True)
+            # Remove espaços duplicados
+            df_limpo[coluna] = df_limpo[coluna].str.replace(r'\s+', ' ', regex=True).str.strip()
+        return df_limpo
+
+    # Teste rápido
+    teste = pd.DataFrame({"texto": ["Olá! Tudo bem? 123", "Teste, nova-linha.\n"]})
+    df2 = remove_pontuacao_numeros(teste)
+    print(df2)
 
     @output
     @render.table
@@ -282,7 +299,7 @@ def setup_server(input, output, session):
 
     @reactive.Calc
     def remove_stopw_minuscula():
-        tabela_editada = conjunto_editavel().get()
+        tabela_editada = conjunto_editavel().get() or []
 
         if tabela_editada is None:
             tabela_editada = []
@@ -303,24 +320,17 @@ def setup_server(input, output, session):
         if len(tabela_editada) == 0:
             return dados_stopw
 
-        '''Ajusta lista stopwords garantindo remoção apenas de palavras inteiras'''
-        stopword_regex = r'\b(' + '|'.join(map(re.escape, tabela_editada)) + r')\b'
+        # Seleciona todas as colunas de texto (object ou string)
+        colunas_texto = dados_stopw.select_dtypes(include=['object', 'string']).columns
 
         for coluna in dados_stopw.columns:
-            if dados_stopw[coluna].dtype == "object":
-                '''Só processa colunas que contenham texto'''
-                if not dados_stopw[coluna].astype(str).str.contains(r"[A-Za-zÀ-ÿ]", regex=True).any():
-                    continue
-
-                '''Remove stopwords, converte para minúsculo, remove espaços extras'''
-                dados_stopw[coluna] = (
-                    dados_stopw[coluna]
-                    .astype(str)
-                    .str.lower()
-                    .str.replace(stopword_regex, ' ', regex=True)
-                    .str.replace(r'\s+', ' ', regex=True)
-                    .str.strip()
-                )
+            def remover_stopwords_tokens(texto):
+                if pd.isna(texto):
+                    return texto
+                palavras = str(texto).lower().split()
+                palavras_filtradas = [p for p in palavras if p not in tabela_editada]
+                return " ".join(palavras_filtradas)
+            dados_stopw[coluna] = dados_stopw[coluna].apply(remover_stopwords_tokens)
 
         print("Dados após remover stopwords:")
         print(dados_stopw.head())
@@ -415,29 +425,38 @@ def setup_server(input, output, session):
         dados = remove_acentuacao_2caracteres()
         return dados
 
-    def calcular_frequencia(df):
-
+    def calcular_frequencia(df, n=1):
         if df is None or df.empty:
-            return pd.DataFrame(columns=["Palavra", "Frequência"])
+            return pd.DataFrame(columns=["Ngrama", "Frequência"])
 
         coluna = df.columns[0]
 
-        dados_freq = (
+        series_ngrams = (
             df[coluna]
             .dropna()
-            .str.split()
-            .explode()
             .str.lower()
-            .value_counts()
-            .reset_index()
+            .str.split()
         )
 
-        dados_freq.columns = ['Palavra', 'Frequência']
+        ngramas = []
 
-        return dados_freq.sort_values(
-            by='Frequência',
-            ascending=False
-    ).reset_index(drop=True)
+        for tokens in series_ngrams:
+            if len(tokens) < n:
+                continue
+
+            for i in range(len(tokens) - n + 1):
+                ngrama = " ".join(tokens[i:i+n])
+                ngramas.append(ngrama)
+
+            df_ngrams = (
+                pd.Series(ngramas)
+                .value_counts()
+                .reset_index()
+            )
+
+        df_ngrams.columns = ["Ngrama", "Frequência"]
+
+        return df_ngrams
 
     @reactive.Calc
     def frequencia_absoluta():
@@ -448,11 +467,13 @@ def setup_server(input, output, session):
     def elege_representante():
         freq = frequencia_absoluta()
 
+        print("DEBUG - colunas do DF:", list(freq.columns))
+
         if freq is None or freq.empty:
             return pd.DataFrame(columns=["Palavra_Lemmatizada"])
 
         return pd.DataFrame({
-            "Palavra_Lemmatizada": freq["Palavra"]
+            "Palavra_Lemmatizada": freq["Ngrama"]
         })
 
     @output
@@ -469,3 +490,112 @@ def setup_server(input, output, session):
     @render.table
     def tabela_frequencia():
         return calcular_frequencia(remove_acentuacao_2caracteres())
+    
+    @output
+    @render.table
+    def tabela_bigramas():
+        return calcular_frequencia(remove_acentuacao_2caracteres(), n=2)
+    
+    @output
+    @render.table
+    def tabela_trigramas():
+        return calcular_frequencia(remove_acentuacao_2caracteres(), n=3)
+    
+    @output
+    @render.table
+    def tabela_tetragramas():
+        return calcular_frequencia(remove_acentuacao_2caracteres(), n=4)
+
+    @output
+    @render.table
+    def tabela_pentagramas():
+        return calcular_frequencia(remove_acentuacao_2caracteres(), n=5)
+
+    ########################
+    # GRÁFICO DE FREQUÊNCIA
+    #########################
+
+    def grafico_ngrama(df, n=1, top_n=20):
+        freq = calcular_frequencia(df, n=n)
+
+        if freq is None or freq.empty:
+            fig, ax = plt.subplots(figsize=(10, 6))
+            ax.text(0.5, 0.5, "Nenhum dado para exibir", ha='center', va='center', fontsize=16)
+            ax.axis('off')
+            return fig
+
+        top_freq = freq.head(top_n)
+
+        fig, ax = plt.subplots(figsize=(12, 8))
+        sns.barplot(x='Frequência', y=freq.columns[0], data=top_freq, palette='viridis', ax=ax)
+        ax.set_title(f'{n}-gramas mais frequentes')
+        ax.set_xlabel('Frequência')
+        ax.set_ylabel('Ngrama')
+        fig.tight_layout()
+        return fig
+
+    @output
+    @render.plot
+    def grafico_ngram():
+        n = input.ngram_n()  # pega valor do slider
+        df_processado = remove_acentuacao_2caracteres()
+        return grafico_ngrama(df_processado, n=n)
+
+    ########################
+    # NUVENS DE PALAVRAS
+    #########################
+
+    #### INCLUIR QUANTIDADE DE PALAVRAS A SEREM REPRESENTADAS NA NUVEM DE PALAVRAS ####
+
+    def nuvem_ngrama(df, n=1, coluna_texto="coments", max_words=50):
+        freq = calcular_frequencia(df, n=n)
+
+        if freq is None or freq.empty:
+            fig, ax = plt.subplots(figsize=(10, 6))
+            ax.text(0.5, 0.5, "Nenhum dado para exibir", ha='center', va='center', fontsize=16)
+            ax.axis('off')
+            return fig
+
+        freq_dict = dict(zip(freq[freq.columns[0]], freq['Frequência']))
+
+        # Cria nuvem
+        nuvem = WordCloud(
+            width=800,
+            height=400,
+            background_color="white",
+            colormap="viridis",
+            max_words=max_words
+        ).generate_from_frequencies(freq_dict)
+
+        # Plota
+        fig, ax = plt.subplots(figsize=(12, 6))
+        ax.imshow(nuvem, interpolation="bilinear")
+        ax.axis('off')
+        return fig
+
+    @output
+    @render.plot
+    def nuvem_ngram():
+        n = input.ngram_n()  # pega valor do slider
+        df_processado = remove_acentuacao_2caracteres()  
+        return nuvem_ngrama(df_processado, n=n, coluna_texto="coments")
+
+    ########################
+    # ANÁLISE DE TÓPICOS
+    #########################
+
+    ########################
+    # SENTIMENTOS
+    #########################
+
+    ########################
+    # CLUSTERIZAÇÃO
+    #########################
+
+    ########################
+    # KMEANS
+    #########################
+
+    ########################
+    # REDES
+    #########################

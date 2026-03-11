@@ -101,30 +101,37 @@ def create_ui():
                     ui.nav_menu(
                         "Tabela de Frequência",
                         ui.nav_panel(
-                            "Palavras", 
-                            ui.output_table("tabela_frequencia")),
-                        ui.nav_panel("Bigramas", "Teste Bigramas"),
-                        ui.nav_panel("Trigramas", "Teste Trigramas"),
-                        ui.nav_panel("Tetragramas", "Teste Tetragramas"),
-                        ui.nav_panel("Pentagramas", "Teste Pentagramas"),
+                            "Palavras", ui.output_table("tabela_frequencia"),
+                        ),
+                        ui.nav_panel(
+                            "Bigramas", ui.output_table("tabela_bigramas"),
+                        ),
+                        ui.nav_panel(
+                            "Trigramas", ui.output_table("tabela_trigramas"),
+                        ),
+                        ui.nav_panel(
+                            "Tetragramas", ui.output_table("tabela_tetragramas"),
+                        ),
+                        ui.nav_panel(
+                            "Pentagramas", ui.output_table("tabela_pentagramas"),
+                        ),
                     ),
 
-                    ui.nav_menu(
-                        "Gráfico de Frequência",
-                        ui.nav_panel("Palavras", "Teste Palavras"),
-                        ui.nav_panel("Bigramas", "Teste Bigramas"),
-                        ui.nav_panel("Trigramas", "Teste Trigramas"),
-                        ui.nav_panel("Tetragramas", "Teste Tetragramas"),
-                        ui.nav_panel("Pentagramas", "Teste Pentagramas"),
+                    ui.nav_panel("Gráfico de Frequência",
+                        # Slider para escolher n
+                        ui.input_slider(
+                            "ngram_n", "Escolha n-grama:", min=1, max=5, value=1, step=1
+                        ),
+                        # Local para o gráfico
+                        ui.output_plot("grafico_ngram")  
                     ),
 
-                    ui.nav_menu(
-                        "Nuvens de palavras",
-                        ui.nav_panel("Palavras", "Teste Palavras"),
-                        ui.nav_panel("Bigramas", "Teste Bigramas"),
-                        ui.nav_panel("Trigramas", "Teste Trigramas"),
-                        ui.nav_panel("Tetragramas", "Teste Tetragramas"),
-                        ui.nav_panel("Pentagramas", "Teste Pentagramas"),
+                    ui.nav_panel(
+                        "Nuvem de palavras",
+                        ui.input_slider(
+                            "ngram_n", "Escolha n-grama:", min=1, max=5, value=1, step=1
+                        ),
+                        ui.output_plot("nuvem_ngram")
                     ),
 
                     ui.nav_menu(
