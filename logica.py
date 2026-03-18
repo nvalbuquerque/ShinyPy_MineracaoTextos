@@ -13,6 +13,8 @@ nlp = spacy.load("pt_core_news_md")
 import matplotlib.pyplot as plt
 import seaborn as sns
 from wordcloud import WordCloud
+from sklearn.decomposition import LatentDirichletAllocation
+from sklearn.feature_extraction.text import CountVectorizer
 
 stopwords_data = load_stopwords()
 stopwords_ptBR = stopwords_data['stopwords_ptBR']
@@ -486,30 +488,29 @@ def setup_server(input, output, session):
     # TABELA DE FREQUÊNCIA
     #########################
 
-    @output
-    @render.table
-    def tabela_frequencia():
-        return calcular_frequencia(remove_acentuacao_2caracteres())
-    
-    @output
-    @render.table
-    def tabela_bigramas():
-        return calcular_frequencia(remove_acentuacao_2caracteres(), n=2)
-    
-    @output
-    @render.table
-    def tabela_trigramas():
-        return calcular_frequencia(remove_acentuacao_2caracteres(), n=3)
-    
-    @output
-    @render.table
-    def tabela_tetragramas():
-        return calcular_frequencia(remove_acentuacao_2caracteres(), n=4)
+    @reactive.Calc
+    def tabela_ngram():
+        escolha = input.frequencia_tipo()
+
+        if escolha == "palavras":
+            n = 1
+        elif escolha == "bigramas":
+            n = 2
+        elif escolha == "trigramas":
+            n = 3
+        elif escolha == "tetragramas":
+            n = 4
+        elif escolha == "pentagramas":
+            n = 5
+        else:
+            return None
+
+        return calcular_frequencia(remove_acentuacao_2caracteres(), n=n)
 
     @output
     @render.table
-    def tabela_pentagramas():
-        return calcular_frequencia(remove_acentuacao_2caracteres(), n=5)
+    def tabela_frequencia():
+        return tabela_ngram()
 
     ########################
     # GRÁFICO DE FREQUÊNCIA
@@ -545,9 +546,8 @@ def setup_server(input, output, session):
     # NUVENS DE PALAVRAS
     #########################
 
-    #### INCLUIR QUANTIDADE DE PALAVRAS A SEREM REPRESENTADAS NA NUVEM DE PALAVRAS ####
-
     def nuvem_ngrama(df, n=1, coluna_texto="coments", max_words=50):
+
         freq = calcular_frequencia(df, n=n)
 
         if freq is None or freq.empty:
@@ -577,16 +577,98 @@ def setup_server(input, output, session):
     @render.plot
     def nuvem_ngram():
         n = input.ngram_n()  # pega valor do slider
+        max_words = input.max_words() if input.max_words() is not None else 50
         df_processado = remove_acentuacao_2caracteres()  
-        return nuvem_ngrama(df_processado, n=n, coluna_texto="coments")
+        return nuvem_ngrama(df_processado, n=n, coluna_texto="coments", max_words=max_words)
 
     ########################
-    # ANÁLISE DE TÓPICOS
+    # ANÁLISE DE TÓPICOS - MODELO LDA: Latent Dirichlet Allocation
     #########################
 
+    def analise_topicos(df, k):
+        df = calcular_frequencia(df, n=1)
+        
+        df["id"] = range(len(df))
+
+        # transforma df em matriz
+        dtm = df.pivot_table(
+            index="id",
+            columns="Ngrama",
+            values="Frequência",
+            fill_value=0
+        )
+
+        lda = LatentDirichletAllocation(n_components=k, random_state=42)
+        
+        # treinamento do modelo
+        lda.fit(dtm)
+
+        topicos = []
+
+        # lda.components_ atribui peso as palavras no tópicos
+        # topico_idx = indice do tópico, termo_idx = indice do termo, value/beta = peso do termo no tópico
+        for topico_idx, topico in enumerate(lda.components_):
+            for termo_idx, value in enumerate(topico):
+                topicos.append({
+                    "Tópico": topico_idx,
+                    "Termo": dtm.columns[termo_idx],
+                    "Peso": value
+                })
+        
+        topicos_df = pd.DataFrame(topicos)
+
+        # normaliza os pesos numa escala de 0 a 1 dentro de cada tópico
+        topicos_df["Peso"] = topicos_df.groupby("Tópico")["Peso"].transform(
+            lambda x: x / x.sum()
+        )
+
+        return topicos_df.sort_values(by=["Tópico", "Peso"], ascending=[True, False])
+
+    @reactive.Calc
+    def tabela_topicos():
+        df_processado = remove_acentuacao_2caracteres()
+        k = input.num_topicos() if input.num_topicos() is not None else 5
+        return analise_topicos(df_processado, k=k)
+        
+    @output
+    @render.table
+    def tabela_analise_topicos():
+        return tabela_topicos()
+
+    @output
+    @render.plot
+    def grafico_analise_topicos():
+        k = input.num_topicos() if input.num_topicos() is not None else 5
+        df_processado = remove_acentuacao_2caracteres()
+        
+        df_topicos = tabela_topicos()
+
+        n_termos = input.termos() if input.termos() is not None else 10
+
+        # pegar top 10 por tópico
+        df_topicos = (
+            df_topicos
+            .groupby("Tópico")
+            .head(n_termos)
+        )
+
+        # exemplo: gráfico simples
+        fig, ax = plt.subplots()
+        
+        for topico in df_topicos["Tópico"].unique():
+            subset = df_topicos[df_topicos["Tópico"] == topico]
+            ax.bar(subset["Termo"], subset["Peso"], label=f"Tópico {topico}")
+        
+        ax.legend()
+        plt.xticks(rotation=90)
+        
+        return fig
+
     ########################
-    # SENTIMENTOS
+    # SENTIMENTOS - método baseado em léxico 
     #########################
+
+
 
     ########################
     # CLUSTERIZAÇÃO
@@ -598,4 +680,4 @@ def setup_server(input, output, session):
 
     ########################
     # REDES
-    #########################
+    ########################

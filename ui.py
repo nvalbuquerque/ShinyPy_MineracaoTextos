@@ -98,23 +98,22 @@ def create_ui():
                         
                     ),
 
-                    ui.nav_menu(
+                    ui.nav_panel(
                         "Tabela de Frequência",
-                        ui.nav_panel(
-                            "Palavras", ui.output_table("tabela_frequencia"),
+                        ui.input_radio_buttons(
+                        "frequencia_tipo",
+                        "Selecione o tipo de n-grama:",
+                            choices={
+                                "palavras": "Palavras",
+                                "bigramas": "Bigramas",
+                                "trigramas": "Trigramas",
+                                "tetragramas": "Tetragramas",
+                                "pentagramas": "Pentagramas",
+                            },
+                            selected="palavras",
+                            inline=True
                         ),
-                        ui.nav_panel(
-                            "Bigramas", ui.output_table("tabela_bigramas"),
-                        ),
-                        ui.nav_panel(
-                            "Trigramas", ui.output_table("tabela_trigramas"),
-                        ),
-                        ui.nav_panel(
-                            "Tetragramas", ui.output_table("tabela_tetragramas"),
-                        ),
-                        ui.nav_panel(
-                            "Pentagramas", ui.output_table("tabela_pentagramas"),
-                        ),
+                        ui.output_table("tabela_frequencia")
                     ),
 
                     ui.nav_panel("Gráfico de Frequência",
@@ -128,19 +127,37 @@ def create_ui():
 
                     ui.nav_panel(
                         "Nuvem de palavras",
-                        ui.input_slider(
+                        # Slider para escolher o número máximo de palavras na nuvem
+                        ui.layout_columns (
+                            ui.input_slider(
                             "ngram_n", "Escolha n-grama:", min=1, max=5, value=1, step=1
+                        ),
+                        ui.input_slider(
+                            "max_words",
+                            "Número máximo de palavras na nuvem:",
+                            min=10,
+                            max=100,
+                            value=50,
+                            step=10
+                        ),
+                        col_widths=(6, 6)
                         ),
                         ui.output_plot("nuvem_ngram")
                     ),
 
-                    ui.nav_menu(
+                    ui.nav_panel(
                         "Análise de tópicos",
-                        ui.nav_panel("Palavras", "Teste Palavras"),
-                        ui.nav_panel("Bigramas", "Teste Bigramas"),
-                        ui.nav_panel("Trigramas", "Teste Trigramas"),
-                        ui.nav_panel("Tetragramas", "Teste Tetragramas"),
-                        ui.nav_panel("Pentagramas", "Teste Pentagramas"),
+                        ui.layout_columns(
+                            ui.input_slider(
+                            "termos", "Número de termos a serem representados:", min=1, max=50, value=10, step=1
+                            ),
+                            ui.input_slider(
+                                "num_topicos", "Número de tópicos:", min=2, max=10, value=5, step=1
+                            ),
+                            col_widths=(6, 6)
+                        ),
+                        ui.output_plot("grafico_analise_topicos"),
+                        ui.output_table("tabela_analise_topicos")
                     ),
 
                     ui.nav_panel("Sentimentos"),
