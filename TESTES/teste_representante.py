@@ -62,7 +62,6 @@ def teste_representante():
         token = doc[0]
         lemma = token.lemma_.lower()
 
-        # 🔥 AQUI entra sua correção
         if lemma not in palavra:
             lemma = palavra
 
