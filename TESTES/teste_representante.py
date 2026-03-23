@@ -1,119 +1,117 @@
 import pandas as pd
-import nltk
 from nltk.stem import SnowballStemmer
 import spacy
 
-# fazer relatorio entre diferença stem e lema para representante de palavras
 
 def teste_representante():
-    caminho = r"C:\Users\Windows 11\Documents\ShinyPy_MineracaoTextos\ShinyPy_MineracaoTextos\TESTES\dados_processados_20251117_224012.csv"
+    caminho = r"Input\00_ComentariosSuperagui.csv"
 
-    dados_processados = pd.read_csv(caminho, encoding='utf-8')
-    
+    # leitura robusta
+    try:
+        dados_processados = pd.read_csv(caminho, encoding='utf-8', sep=';')
+    except Exception:
+        dados_processados = pd.read_csv(caminho, encoding='utf-8', sep=None, engine='python')
+
     print("Primeiras 5 linhas:")
     print(dados_processados.head(5))
-            
-    coluna_texto = None
-    for coluna in dados_processados.columns:
-        if dados_processados[coluna].dtype == 'object':
-            coluna_texto = coluna
-            break
 
-    print(f"\nNome coluna de texto: '{coluna_texto}'")
+    # coluna fixa
+    coluna_texto = "coments"
+    if coluna_texto not in dados_processados.columns:
+        raise ValueError(f"A coluna '{coluna_texto}' não existe no dataset.")
 
-    # FREQUENCIA ABSOLUTA
+    # =========================
+    # FREQUÊNCIA
+    # =========================
     dados_freq = (
         dados_processados[coluna_texto]
         .dropna()
         .astype(str)
+        .str.lower()
         .str.split()
         .explode()
-        .str.lower()
         .value_counts()
         .reset_index()
     )
 
     dados_freq.columns = ['Palavra', 'Frequência']
     dados_freq = dados_freq.sort_values(by='Frequência', ascending=False).reset_index(drop=True)
-    
+
     print(f"\n{len(dados_freq)} palavras únicas")
-    print("\n10 PALAVRAS MAIS FREQUENTES:")
-    print(dados_freq.head(10).to_string(index=False))
-    
-    '''
-    # REPRESENTANTE POR STEMMING
+
+    # =========================
+    # STEM (TODAS as palavras)
+    # =========================
     stemmer = SnowballStemmer('portuguese')
-    palavras_originais = []
-    stems = []
+    dados_freq['Stem'] = dados_freq['Palavra'].apply(stemmer.stem)
 
-    for index, row in dados_freq.iterrows():
-        palavra = row['Palavra']
-        frequencia = row['Frequência']
-        stem = stemmer.stem(palavra)
+    # =========================
+    # LEMMA (TODAS as palavras)
+    # =========================
+    nlp = spacy.load("pt_core_news_md")
 
-        if stem not in stems:
-            palavras_originais.append(palavra)
-            stems.append(stem)
+    docs = list(nlp.pipe(dados_freq['Palavra']))
 
-    resultadoStem = pd.DataFrame({
-        "Palavra_Representante": palavras_originais,
-        "Stem_Agrupador": stems
-    })
+    lemas = []
+
+    for doc, palavra in zip(docs, dados_freq['Palavra']):
+        if len(doc) == 0:
+            lemas.append(palavra)
+            continue
+
+        token = doc[0]
+        lemma = token.lemma_.lower()
+
+        # 🔥 AQUI entra sua correção
+        if lemma not in palavra:
+            lemma = palavra
+
+        lemas.append(lemma)
+
+    dados_freq['Lemma'] = lemas
+
+    # =========================
+    # REPRESENTANTES STEM
+    # =========================
+    resultadoStem = (
+        dados_freq
+        .drop_duplicates(subset=['Stem'])
+        [['Palavra', 'Stem']]
+        .rename(columns={
+            "Palavra": "Palavra_Representante",
+            "Stem": "Stem_Agrupador"
+        })
+    )
 
     print(f"\n{len(resultadoStem)} stems únicos")
-    print("\nPRIMEIROS 15 REPRESENTANTES STEM:")
-    print(resultadoStem.head(15).to_string(index=False))
+    print("\nPRIMEIROS 50 REPRESENTANTES STEM:")
+    print(resultadoStem.head(50).to_string(index=False))
 
-    '''
-
-    # REPRESENTANTE POR LEMATIZAÇÃO USANDO NLTK
-        # Não funciona pq o nltk não tem suporte para lematização em português
-    
-    # REPRESENTANTE POR LEMATIZAÇÃO USANDO SPACY
-    # criar dicionario de atrativos turísticos do paraná para melhorar lematização, substituir areiar por areia
-    # colocar parametrização: processo de seleção das palavras que não devem ser processadas pelo código, lembrar stopwords. O usuário escolhe
-    nlp = spacy.load("pt_core_news_sm")
-    palavras_representantes = []
-    lemas_agrupadores = []
-
-    for _, row in dados_freq.iterrows():
-        palavra = row['Palavra']
-        doc = nlp(palavra)
-        
-        if len(doc) > 0:
-            token = doc[0]
-            if token.pos_ in ["VERB", "AUX"]:
-                lemma = token.lemma_.lower()
-            else:
-                lemma = palavra.lower()  
-
-            if lemma not in lemas_agrupadores:
-                palavras_representantes.append(palavra)
-                lemas_agrupadores.append(lemma)
-
-    resultadoLema = pd.DataFrame({
-        "Palavra_Representante": palavras_representantes,
-        "Lema_Agrupador": lemas_agrupadores
-    })
+    # =========================
+    # REPRESENTANTES LEMA
+    # =========================
+    resultadoLema = (
+        dados_freq
+        .drop_duplicates(subset=['Lemma'])
+        [['Palavra', 'Lemma']]
+        .rename(columns={
+            "Palavra": "Palavra_Representante",
+            "Lemma": "Lema_Agrupador"
+        })
+    )
 
     print(f"\n{len(resultadoLema)} lemas únicos")
-    print("\nPRIMEIROS 15 REPRESENTANTES LEMA:")
-    print(resultadoLema.head(15).to_string(index=False))
+    print("\nPRIMEIROS 50 REPRESENTANTES LEMA:")
+    print(resultadoLema.head(50).to_string(index=False))
 
-    # COMPARATIVO
-    # Renomear colunas para facilitar merge
-    freq = dados_freq.rename(columns={"Palavra": "Palavra_Original"})
-    #stem = resultadoStem.rename(columns={"Palavra_Representante": "Palavra_Original"})
-    lema = resultadoLema.rename(columns={"Palavra_Representante": "Palavra_Original"})
-
-    # Fazer merge progressivo
-    #comparativo = freq.merge(stem, on="Palavra_Original", how="left") \ .merge(lema, on="Palavra_Original", how="left")
-    comparativo = freq.merge(lema, on="Palavra_Original", how="left")
-
+    # =========================
+    # COMPARATIVO (SEM MERGE)
+    # =========================
     print("\n=== COMPARAÇÃO: Palavra | Frequência | Stem | Lemma ===")
-    print(comparativo.head(30).to_string(index=False))
+    print(dados_freq.head(150).to_string(index=False))
 
-    return comparativo
+    return dados_freq
+
 
 if __name__ == "__main__":
     resultado = teste_representante()
