@@ -4,7 +4,7 @@ import spacy
 
 
 def teste_representante():
-    caminho = r"C:\Users\Windows 11\Documents\ShinyPy_MineracaoTextos\ShinyPy_MineracaoTextos\Input\00_ComentariosSuperagui.csv"
+    caminho = r"Input\00_ComentariosSuperagui.csv"
 
     # leitura robusta
     try:
@@ -110,6 +110,7 @@ def teste_representante():
     print(dados_freq.head(150).to_string(index=False))
 
     return dados_freq
+
 
 if __name__ == "__main__":
     resultado = teste_representante()
