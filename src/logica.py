@@ -1,20 +1,17 @@
 from shiny import reactive, render, ui
 import pandas as pd
-import string
-import re
-import io
-from datetime import datetime
-import nltk
-from nltk.stem.snowball import SnowballStemmer
 from config import load_stopwords
 import spacy
+import re
 # Biblioteca média de língua portuguesa no spaCy
 nlp = spacy.load("pt_core_news_md")
+from nltk.stem import SnowballStemmer 
 import matplotlib.pyplot as plt
 import seaborn as sns
 from wordcloud import WordCloud
 from sklearn.decomposition import LatentDirichletAllocation
 from sklearn.feature_extraction.text import CountVectorizer
+import unicodedata
 
 stopwords_data = load_stopwords()
 stopwords_ptBR = stopwords_data['stopwords_ptBR']
@@ -22,7 +19,7 @@ stopwords_comentarios = stopwords_data['stopwords_comentarios']
 stopwords_iso = stopwords_data['stopwords_iso']
 all_stopwords = stopwords_data['all_stopwords']
 
-def setup_server(input, output, session):    
+def setup_server(input, output, session): 
     @reactive.Calc  
     def processa_dados():
         file_info = input.file1()
@@ -85,46 +82,68 @@ def setup_server(input, output, session):
                     
         except Exception as e: 
             return f"Erro crítico: {str(e)}"
-    
+        
+    @output
+    @render.ui
+    def escolha_coluna():
+        dados = processa_dados()
+        if dados is None or not isinstance(dados, pd.DataFrame):
+            return ui.p("Carregue um arquivo para selecionar a coluna de texto.")
+        
+        colunas_texto = list(dados.columns)
+        
+        return ui.input_select(
+            "coluna_texto",
+            "Selecione a coluna de texto:",
+            choices=colunas_texto
+        )
+   
+    @reactive.Calc
+    def coluna_selecionada():
+        dados = processa_dados()
+        coluna = input.coluna_texto()
+        
+        if dados is None or not isinstance(dados, pd.DataFrame):
+            return None
+        if coluna not in dados.columns:
+            return None
+        
+        return dados[coluna]
+
     @output
     @render.table
     def tabela_dados():
         dados = processa_dados()
+        coluna = input.coluna_texto()
     
         if dados is None:
             return pd.DataFrame({"Status": ["Nenhum dado disponível"]})
         
-        elif isinstance(dados, pd.DataFrame):
-            if dados.empty:
-                return pd.DataFrame({"Status": ["DataFrame vazio"]})
-            return dados.reset_index().astype(str).replace("nan", "").replace("None", "")
+        if not isinstance(dados, pd.DataFrame):
+            return pd.DataFrame({"Erro": [str(dados)]})
         
-        else:
-            try:
-                df = pd.DataFrame(dados)
-                return df.reset_index().astype(str).replace("nan", "").replace("None", "")
-            except:
-                return pd.DataFrame({"Erro": ["Não foi possível processar os dados"]})
+        if dados.empty:
+            return pd.DataFrame({"Status": ["DataFrame vazio"]})
+        
+        if coluna and coluna in dados.columns:
+            outras = [c for c in dados.columns if c != coluna]
+            dados = dados[[coluna] + outras]
+
+        return dados.reset_index().astype(str).replace("nan", "").replace("None", "")
         
     @output
     @render.text
     def info_dados():
-        dados = processa_dados()
+        serie = coluna_selecionada()
+
+        if serie is None:
+            return "Nenhuma coluna selecionada"
         
-        if dados is None:
-            return "Nenhum dado carregado"
-        
-        elif isinstance(dados, pd.DataFrame):
-            missing = dados.isna().sum()
-            total_missing = missing.sum()
-                
-            return (
-                f"Informações: {len(dados)} linhas e {len(dados.columns)} colunas | "
-                f"Quantidade de valores faltantes: {total_missing}"            
-            )
-        
-        else:
-            return "Tipo de dado não reconhecido"
+        total = len(serie)
+        vazios = serie.isna().sum()
+        media_palavras = serie.str.split().str.len().mean()
+
+        return f"Coluna selecionada: {total} registros | Registros vazios: {vazios} | Média de palavras por registro: {media_palavras:.2f}"
     
     ########################
     # STOPWORDS
@@ -250,11 +269,6 @@ def setup_server(input, output, session):
             df_limpo[coluna] = df_limpo[coluna].str.replace(r'\s+', ' ', regex=True).str.strip()
         return df_limpo
 
-    # Teste rápido
-    teste = pd.DataFrame({"texto": ["Olá! Tudo bem? 123", "Teste, nova-linha.\n"]})
-    df2 = remove_pontuacao_numeros(teste)
-    print(df2)
-
     @output
     @render.table
     def tabela_sem_pontuacao_num():
@@ -298,47 +312,214 @@ def setup_server(input, output, session):
         else:
             return None
         
+    def lemmatizar_lista(textos):
+        docs = list(nlp.pipe(textos.astype(str)))
+        lemas_processados = []
+
+        for doc in docs:
+            palavras_lematizadas = [token.lemma_.lower() for token in doc]
+            lemas_processados.append(" ".join(palavras_lematizadas))
+
+        return lemas_processados
+
+    @reactive.Calc
+    def texto_lemmatizado():
+        dados = remove_repeticao()
+        if dados is None or dados.empty:
+            return None
+
+        col = input.coluna_texto()
+        if not col or col not in dados.columns:
+            return dados
+
+        dados = dados.copy()
+        textos = dados[col].astype(str)
+        stemmer = SnowballStemmer('portuguese')
+
+        # ==========================================
+        # lema por contexto (frase inteira)
+        # ==========================================
+        docs_contexto = list(nlp.pipe(textos.str.lower()))
+
+        lema_por_contexto = {}  
+
+        for doc in docs_contexto:
+            for token in doc:
+                palavra = token.text.lower()
+                lemma = token.lemma_.lower()
+                if lemma not in palavra:
+                    lemma = palavra
+                # só registra se ainda não viu essa palavra
+                # (primeira ocorrência = contexto mais representativo)
+                if palavra not in lema_por_contexto:
+                    lema_por_contexto[palavra] = lemma
+
+        # ==========================================
+        # lema por palavra isolada
+        # mais estável, sem erro de contexto (evitando lemmas malucos tipo lir para lindo ou areiar para areia)
+        # ==========================================
+        dados_freq = (
+            textos
+            .str.lower()
+            .str.split()
+            .explode()
+            .dropna()
+            .value_counts()
+            .reset_index()
+        )
+        dados_freq.columns = ['Palavra', 'Frequência']
+        dados_freq = dados_freq.sort_values(by='Frequência', ascending=False).reset_index(drop=True)
+
+        docs_isolado = list(nlp.pipe(dados_freq['Palavra']))
+
+        lema_por_isolado = {}  
+
+        for doc, palavra in zip(docs_isolado, dados_freq['Palavra']):
+            if len(doc) == 0:
+                lema_por_isolado[palavra] = palavra
+                continue
+            lemma = doc[0].lemma_.lower()
+            if lemma not in palavra:
+                lemma = palavra
+            lema_por_isolado[palavra] = lemma
+
+        # ==========================================
+        # stem como agrupador morfológico
+        # resolve gênero/número que spaCy não agrupa
+        # ==========================================
+        mapa_stem = {}   # stem → representante (palavra mais frequente)
+        mapa_final = {}  # palavra → representante final
+
+        for _, row in dados_freq.iterrows():
+            palavra = row['Palavra']
+
+            lema_ctx = lema_por_contexto.get(palavra, palavra)
+            lema_iso = lema_por_isolado.get(palavra, palavra)
+
+            # decisão: prefere lema contextual, usa isolado como fallback
+            # se os dois concordam → confiança alta
+            # se divergem → usa o isolado (mais estável)
+            if lema_ctx == lema_iso:
+                lemma_escolhido = lema_ctx   # ← alta confiança
+            else:
+                lemma_escolhido = lema_iso   # ← fallback mais estável
+
+            # encadeamento: se o lema escolhido já tem representante, usa ele
+            if lemma_escolhido in mapa_final:
+                lemma_escolhido = mapa_final[lemma_escolhido]
+
+            # stem como ponte para variações de gênero/número
+            stem = stemmer.stem(palavra)
+
+            if stem in mapa_stem:
+                representante = mapa_stem[stem]
+            else:
+                representante = lemma_escolhido
+                mapa_stem[stem] = representante
+
+            mapa_final[palavra] = representante
+
+        def aplicar_lema(texto):
+            tokens = str(texto).lower().split()
+            return " ".join(mapa_final.get(t, t) for t in tokens)
+
+        dados[col] = textos.apply(aplicar_lema)
+
+        return dados
+
+    @reactive.Calc
+    def remove_acentuacao_2caracteres():
+        dados_processados = texto_lemmatizado()
+
+        if dados_processados is None or not isinstance(dados_processados, pd.DataFrame):
+            print("Df vazio ou inválido")
+            return None
+
+        col = input.coluna_texto()
+
+        if not col or col not in dados_processados.columns:
+            print("Coluna inválida:", col)
+            return None
+
+        lista_excecao = [
+            'ac', 'al', 'ap', 'am', 'ba', 'ce', 'df', 'es', 'go', 'ma', 
+            'mt', 'ms', 'mg', 'pa', 'pb', 'pr', 'pe', 'pi', 'rj', 'rn', 
+            'rs', 'ro', 'rr', 'sc', 'sp', 'se', 'to', 'br', 'ir', 'km', 'ar'
+        ]
+
+        # unicode para remover acentos
+        def remover_acentos(texto):
+            if pd.isna(texto):
+                return ""
+            return ''.join(
+                c for c in unicodedata.normalize('NFKD', str(texto))
+                if not unicodedata.combining(c)
+            )
+
+        def remover_palavras_curta(texto):
+            palavras = texto.split()
+            filtradas = [
+                p for p in palavras
+                if len(p) > 2 or p.lower() in lista_excecao
+            ]
+            return ' '.join(filtradas)
+
+        serie = dados_processados[col].astype(str)
+
+        coluna_tratada = (
+            serie
+            .apply(remover_acentos)
+            .str.lower()
+            .apply(remover_palavras_curta)
+            .str.replace(r'\s+', ' ', regex=True)
+            .str.strip()
+        )
+
+        return pd.DataFrame({
+            "Sem acento e sem palavras curtas": coluna_tratada
+        })
+
+    @output
+    @render.table
+    def tabela_acentuacao_2caracteres():
+        dados = remove_acentuacao_2caracteres()
+        return dados
+
 
     @reactive.Calc
     def remove_stopw_minuscula():
         tabela_editada = conjunto_editavel().get() or []
 
-        if tabela_editada is None:
-            tabela_editada = []
-        
-        tabela_editada = [str(s).strip().lower() for s in tabela_editada if str(s).strip() != ""]
+        # Normaliza stopwords: remove acento + lemmatiza
+        def normalizar_stopword(s):
+            return ''.join(
+                c for c in unicodedata.normalize('NFKD', s)
+                if not unicodedata.combining(c)
+            ).lower().strip()
 
-        print("Stopwords recebidas:", tabela_editada)
+        tabela_editada = [normalizar_stopword(s) for s in tabela_editada]
 
-        dados = remove_repeticao()
+        # ✅ Use remove_acentuacao_2caracteres() — já normalizado
+        dados = remove_acentuacao_2caracteres()
 
         if dados is None or not isinstance(dados, pd.DataFrame):
-            print("remove_repeticao retornou vazio")
             return None
 
         dados_stopw = dados.copy()
+        coluna = "Sem acento e sem palavras curtas"  # nome da coluna gerada por remove_acentuacao_2caracteres
 
-        # Não montar regex se stopwords estiverem vazias
-        if len(tabela_editada) == 0:
+        if coluna not in dados_stopw.columns:
             return dados_stopw
 
-        # Seleciona todas as colunas de texto (object ou string)
-        colunas_texto = dados_stopw.select_dtypes(include=['object', 'string']).columns
+        def remover_stopwords_tokens(texto):
+            if pd.isna(texto):
+                return texto
+            palavras = str(texto).lower().split()
+            return " ".join(p for p in palavras if p not in tabela_editada)
 
-        for coluna in dados_stopw.columns:
-            def remover_stopwords_tokens(texto):
-                if pd.isna(texto):
-                    return texto
-                palavras = str(texto).lower().split()
-                palavras_filtradas = [p for p in palavras if p not in tabela_editada]
-                return " ".join(palavras_filtradas)
-            dados_stopw[coluna] = dados_stopw[coluna].apply(remover_stopwords_tokens)
-
-        print("Dados após remover stopwords:")
-        print(dados_stopw.head())
+        dados_stopw[coluna] = dados_stopw[coluna].apply(remover_stopwords_tokens)
 
         return dados_stopw
-
 
     @output
     @render.table
@@ -349,93 +530,19 @@ def setup_server(input, output, session):
         else:
             return None
         
-    def lemmatizar_texto(texto):
-        if pd.isna(texto):
-            return texto
-        doc = nlp(str(texto))
-        return " ".join([token.lemma_ for token in doc])
-
-    @reactive.Calc
-    def texto_lemmatizado():
-        dados = remove_stopw_minuscula()
-
-        if dados is None or dados.empty:
-            return None
-
-        col = "coments"  # ou sua coluna textual
-
-        dados[col] = dados[col].apply(lemmatizar_texto)
-
-        return dados
-        
-    @reactive.Calc 
-    def remove_acentuacao_2caracteres():
-        dados_processados = texto_lemmatizado()
-        
-        print(dados_processados.head())
-
-        if dados_processados is None or not isinstance(dados_processados, pd.DataFrame):
-            print("Df vazio")
-            return None
-
-        print("DEBUG - colunas do DF:", list(dados_processados.columns))
-        
-        colunas_texto = dados_processados.select_dtypes(
-            include=['object', 'string']
-        ).columns.tolist()
-
-        colunas_texto = [c for c in colunas_texto if c.lower() != 'id']
-
-        if len(colunas_texto) == 0:
-            print("Nenhuma coluna textual válida encontrada")
-            return None
-        
-        col = colunas_texto[0]
-    
-        lista_excecao = [
-            'ac', 'al', 'ap', 'am', 'ba', 'ce', 'df', 'es', 'go', 'ma', 
-            'mt', 'ms', 'mg', 'pa', 'pb', 'pr', 'pe', 'pi', 'rj', 'rn', 
-            'rs', 'ro', 'rr', 'sc', 'sp', 'se', 'to', 'br', 'ir', 'km', 'ar'
-        ]
-    
-        def remover_acentos(texto):
-            if pd.isna(texto):
-                return texto
-            mapa_acentos = str.maketrans(
-                "áàãâäéèêëíìîïóòõôöúùûüçÁÀÃÂÄÉÈÊËÍÌÎÏÓÒÕÔÖÚÙÛÜÇ",
-                "aaaaaeeeeiiiiooooouuuucAAAAAEEEEIIIIOOOOOUUUUC"
-            )
-            return str(texto).translate(mapa_acentos)
-            
-        regex_com_excecoes = r'\b(?!' + '|'.join(lista_excecao) + r')\w{1,2}\b'
-            
-        coluna_tratada = (
-            dados_processados[col]
-            .apply(remover_acentos)
-            .str.replace(regex_com_excecoes, '', regex=True)
-            .str.replace(r'\s+', ' ', regex=True)
-            .str.strip()
-        )
-
-        return pd.DataFrame({
-            "Sem acento e 2 caracteres": coluna_tratada
-        })
-
-    @output
-    @render.table
-    def tabela_acentuacao_2caracteres():
-        dados = remove_acentuacao_2caracteres()
-        return dados
-
     def calcular_frequencia(df, n=1):
         if df is None or df.empty:
             return pd.DataFrame(columns=["Ngrama", "Frequência"])
 
         coluna = df.columns[0]
 
+        if coluna not in df.columns:
+            return pd.DataFrame(columns=["Ngrama", "Frequência"])
+
         series_ngrams = (
             df[coluna]
             .dropna()
+            .astype(str)
             .str.lower()
             .str.split()
         )
@@ -450,39 +557,15 @@ def setup_server(input, output, session):
                 ngrama = " ".join(tokens[i:i+n])
                 ngramas.append(ngrama)
 
-            df_ngrams = (
-                pd.Series(ngramas)
-                .value_counts()
-                .reset_index()
-            )
+        df_ngrams = (
+            pd.Series(ngramas)
+            .value_counts()
+            .reset_index()
+        )
 
         df_ngrams.columns = ["Ngrama", "Frequência"]
 
         return df_ngrams
-
-    @reactive.Calc
-    def frequencia_absoluta():
-        dados_processados = remove_acentuacao_2caracteres()
-        return calcular_frequencia(dados_processados)
-
-    @reactive.Calc
-    def elege_representante():
-        freq = frequencia_absoluta()
-
-        print("DEBUG - colunas do DF:", list(freq.columns))
-
-        if freq is None or freq.empty:
-            return pd.DataFrame(columns=["Palavra_Lemmatizada"])
-
-        return pd.DataFrame({
-            "Palavra_Lemmatizada": freq["Ngrama"]
-        })
-
-    @output
-    @render.table
-    def tabela_elege_representante():
-        dados = elege_representante()
-        return dados
     
     ########################
     # TABELA DE FREQUÊNCIA
@@ -505,7 +588,7 @@ def setup_server(input, output, session):
         else:
             return None
 
-        return calcular_frequencia(remove_acentuacao_2caracteres(), n=n)
+        return calcular_frequencia(remove_stopw_minuscula(), n=n)
 
     @output
     @render.table
@@ -539,7 +622,7 @@ def setup_server(input, output, session):
     @render.plot
     def grafico_ngram():
         n = input.ngram_n()  # pega valor do slider
-        df_processado = remove_acentuacao_2caracteres()
+        df_processado = remove_stopw_minuscula()
         return grafico_ngrama(df_processado, n=n)
 
     ########################
@@ -578,7 +661,7 @@ def setup_server(input, output, session):
     def nuvem_ngram():
         n = input.ngram_n()  # pega valor do slider
         max_words = input.max_words() if input.max_words() is not None else 50
-        df_processado = remove_acentuacao_2caracteres()  
+        df_processado = remove_stopw_minuscula()  
         return nuvem_ngrama(df_processado, n=n, coluna_texto="coments", max_words=max_words)
 
     ########################
@@ -626,7 +709,7 @@ def setup_server(input, output, session):
 
     @reactive.Calc
     def tabela_topicos():
-        df_processado = remove_acentuacao_2caracteres()
+        df_processado = remove_stopw_minuscula()
         k = input.num_topicos() if input.num_topicos() is not None else 5
         return analise_topicos(df_processado, k=k)
         
@@ -639,20 +722,20 @@ def setup_server(input, output, session):
     @render.plot
     def grafico_analise_topicos():
         k = input.num_topicos() if input.num_topicos() is not None else 5
-        df_processado = remove_acentuacao_2caracteres()
+        df_processado = remove_stopw_minuscula()
         
         df_topicos = tabela_topicos()
 
         n_termos = input.termos() if input.termos() is not None else 10
 
-        # pegar top 10 por tópico
+        # pegar segundo n_termos por tópico
         df_topicos = (
             df_topicos
             .groupby("Tópico")
             .head(n_termos)
         )
 
-        # exemplo: gráfico simples
+        # fazendo 1 gráfico só para todos os tópicos
         fig, ax = plt.subplots()
         
         for topico in df_topicos["Tópico"].unique():
@@ -665,19 +748,11 @@ def setup_server(input, output, session):
         return fig
 
     ########################
-    # SENTIMENTOS - método baseado em léxico 
-    #########################
-
-
-
-    ########################
     # CLUSTERIZAÇÃO
     #########################
+    #utilizar baseado por frequencia absoluta
+    #olhar código daphne
 
     ########################
     # KMEANS
     #########################
-
-    ########################
-    # REDES
-    ########################

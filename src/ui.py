@@ -30,6 +30,7 @@ def create_ui():
                     ui.nav_panel(
                         "Dados importados",
                         ui.output_text("info_dados"),
+                        ui.output_ui("escolha_coluna"),
                         ui.output_table("tabela_dados"),
                     ),
 
@@ -80,22 +81,17 @@ def create_ui():
                             ui.output_table("tabela_sem_pontuacao_num"),
                         ),
                         ui.nav_panel(
-                            "Remove caracteres repetidos",
+                            "Lematiza e remove caracteres repetidos",
                             ui.output_table("tabela_sem_repeticao"),
-                        ),
-                        ui.nav_panel(
-                            "Remove stopwords e converte para minúsculo",
-                            ui.output_table("tabela_sem_stopwords_minuscula"),
                         ),
                         ui.nav_panel(
                             "Remove acentuação e dois caracteres",
                             ui.output_table("tabela_acentuacao_2caracteres"),
                         ),
                         ui.nav_panel(
-                            "Elege representante",
-                            ui.output_table("tabela_elege_representante"),
+                            "Remove stopwords e converte para minúsculo",
+                            ui.output_table("tabela_sem_stopwords_minuscula"),
                         ),
-                        
                     ),
 
                     ui.nav_panel(
@@ -160,10 +156,8 @@ def create_ui():
                         ui.output_table("tabela_analise_topicos")
                     ),
 
-                    ui.nav_panel("Sentimentos"),
                     ui.nav_panel("Clusterização"),
                     ui.nav_panel("KMeans"),
-                    ui.nav_panel("Redes"),
 
                     id="page",
                 ),
