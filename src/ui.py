@@ -81,11 +81,11 @@ def create_ui():
                             ui.output_table("tabela_sem_pontuacao_num"),
                         ),
                         ui.nav_panel(
-                            "Lematiza e remove caracteres repetidos",
+                            "Remove caracteres repetidos",
                             ui.output_table("tabela_sem_repeticao"),
                         ),
                         ui.nav_panel(
-                            "Remove acentuação e dois caracteres",
+                            "Lematiza, remove acentuação e dois caracteres",
                             ui.output_table("tabela_acentuacao_2caracteres"),
                         ),
                         ui.nav_panel(
